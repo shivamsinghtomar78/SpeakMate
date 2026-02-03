@@ -34,7 +34,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             }
             onClose()
         } catch (err: any) {
-            setError(err.message || 'Authentication failed')
+            console.error('Email authentication error:', err)
+            if (err.code === 'auth/unauthorized-domain') {
+                setError('Error: This domain is not authorized in your Firebase Console. Please add your current domain to the "Authorized domains" list in the Firebase Authentication settings.')
+            } else {
+                setError(err.message || 'Authentication failed')
+            }
         } finally {
             setLoading(false)
         }
@@ -48,7 +53,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             await signInWithGoogle()
             onClose()
         } catch (err: any) {
-            setError(err.message || 'Google sign-in failed')
+            console.error('Google sign-in error:', err)
+            if (err.code === 'auth/unauthorized-domain') {
+                setError('Error: This domain is not authorized in your Firebase Console. Please add your current domain to the "Authorized domains" list in the Firebase Authentication settings.')
+            } else {
+                setError(err.message || 'Google sign-in failed')
+            }
         } finally {
             setLoading(false)
         }
