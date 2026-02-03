@@ -86,6 +86,16 @@ app.add_middleware(
 
 # ============ Health Check ============
 
+@app.get("/")
+async def root():
+    """Root endpoint for health checks."""
+    return {
+        "message": "SpeakMate API is running",
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

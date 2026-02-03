@@ -1,13 +1,25 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Mic, Headphones, MessageCircle, TrendingUp } from 'lucide-react'
+import { Mic, Headphones, MessageCircle, TrendingUp, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import Button from '@/components/Button'
 import { motion } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
 
 export default function LandingPage() {
+    const { user, loading } = useAuth()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (!loading && user) {
+            router.push('/dashboard')
+        }
+    }, [user, loading, router])
+
+    if (loading || user) return null
+
     return (
         <main className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#0f0f1a] to-[#1a1025] overflow-hidden">
             {/* Animated Background Orbs */}
