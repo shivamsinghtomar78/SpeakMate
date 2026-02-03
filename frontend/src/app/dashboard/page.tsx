@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Clock, Target, Flame, TrendingUp, Play, Calendar } from 'lucide-react'
+import { Clock, Target, Flame, TrendingUp, Play, Calendar, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import Header from '@/components/Header'
