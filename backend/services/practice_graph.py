@@ -127,8 +127,16 @@ INSTRUCTIONS:
             
         return prompt
 
-    async def run(self, user_input: str, history: List[BaseMessage], level: str, topic: str) -> Dict[str, Any]:
+    @traceable(name="PracticeGraph.run")
+    async def run(self, user_input: str, history: List[BaseMessage], level: str, topic: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """Run the graph for a single turn."""
+        # Set up metadata for tracing
+        metadata = {
+            "session_id": session_id,
+            "level": level,
+            "topic": topic
+        }
+        
         initial_state = {
             "messages": history + [HumanMessage(content=user_input)],
             "level": level,

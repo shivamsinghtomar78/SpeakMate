@@ -172,7 +172,17 @@ Be warm, patient, and supportive. Focus on helping them improve their English sp
         
         await self.ws.send(json.dumps(settings_message))
         logger.info("Sent Voice Agent settings with Groq LLM")
-        logger.debug(f"Settings: {json.dumps(settings_message, indent=2)}")
+        
+        # Mask credentials in logs
+        try:
+            log_settings = json.loads(json.dumps(settings_message))
+            if "agent" in log_settings and "think" in log_settings["agent"]:
+                headers = log_settings["agent"]["think"].get("endpoint", {}).get("headers", {})
+                if "Authorization" in headers:
+                    headers["Authorization"] = "Bearer [MASKED]"
+            logger.debug(f"Settings: {json.dumps(log_settings, indent=2)}")
+        except Exception:
+            logger.debug("Sent settings (masking failed)")
     
     def _get_greeting(self, level: str) -> str:
         """Get appropriate greeting based on level."""

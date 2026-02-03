@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Mail, Calendar, Settings, LogOut, Camera } from 'lucide-react'
+import { User, Mail, Calendar, Settings, LogOut, Camera, Target, Flame } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import Header from '@/components/Header'
@@ -114,6 +114,62 @@ export default function ProfilePage() {
                             </div>
                         </div>
                     </Card>
+
+                    {/* Learning Progress Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <Card>
+                            <h2 className="text-xl font-bold text-white mb-6">Learning Progress</h2>
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm text-gray-400">Overall Proficiency</span>
+                                        <span className="text-sm font-bold text-indigo-400">65%</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: '65%' }}
+                                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Consistency</p>
+                                        <p className="text-lg font-bold text-white">8/10</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Vocabulary</p>
+                                        <p className="text-lg font-bold text-white">B2</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <Card>
+                            <h2 className="text-xl font-bold text-white mb-6">Recommended Focus</h2>
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Target className="w-4 h-4 text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-white mb-1">Sentence Complexity</p>
+                                        <p className="text-xs text-gray-400">Try using more relative clauses and conjunctions in your speech.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Flame className="w-4 h-4 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-white mb-1">Pronunciation</p>
+                                        <p className="text-xs text-gray-400">Focus on the 'th' sounds and intonation in questions.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
 
                     {/* Session History */}
                     <Card>

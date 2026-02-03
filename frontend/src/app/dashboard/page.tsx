@@ -10,61 +10,70 @@ import Header from '@/components/Header'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 
-interface Stats {
-    totalSessions: number
-    totalMinutes: number
-    currentStreak: number
-    longestStreak: number
+interface SessionStat {
+    date: string
+    confidence: number
+}
+
+interface Analytics {
+    total_sessions: number
+    total_practice_time: string
+    total_words_spoken: number
+    avg_confidence: number
+    confidence_trend: string
+    recent_scores: number[]
+    common_improvement_areas: string[]
+    improvement_score: number
 }
 
 export default function DashboardPage() {
     const { user } = useAuth()
     const router = useRouter()
-    const [stats, setStats] = useState<Stats>({
-        totalSessions: 0,
-        totalMinutes: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-    })
+    const [analytics, setAnalytics] = useState<Analytics | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        // TODO: Fetch user stats from backend
-        // For now, mock data
-        setTimeout(() => {
-            setStats({
-                totalSessions: 12,
-                totalMinutes: 240,
-                currentStreak: 3,
-                longestStreak: 7,
-            })
-            setLoading(false)
-        }, 500)
-    }, [])
+        const fetchAnalytics = async () => {
+            if (!user?.uid) return
+            try {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/${user.uid}/analytics`)
+                if (response.ok) {
+                    const data = await response.json()
+                    setAnalytics(data)
+                }
+            } catch (error) {
+                console.error('Failed to fetch analytics:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchAnalytics()
+    }, [user])
 
     const statsCards = [
         {
             icon: Target,
             label: 'Total Sessions',
-            value: stats.totalSessions,
+            value: analytics?.total_sessions ?? 0,
             color: 'from-indigo-500 to-blue-500',
         },
         {
             icon: Clock,
             label: 'Practice Time',
-            value: `${Math.floor(stats.totalMinutes / 60)}h ${stats.totalMinutes % 60}m`,
+            value: analytics?.total_practice_time ?? '0m',
             color: 'from-purple-500 to-pink-500',
         },
         {
             icon: Flame,
-            label: 'Current Streak',
-            value: `${stats.currentStreak} days`,
+            label: 'Common Mistakes',
+            value: analytics?.common_improvement_areas?.[0] || 'None',
             color: 'from-orange-500 to-red-500',
         },
         {
             icon: TrendingUp,
-            label: 'Longest Streak',
-            value: `${stats.longestStreak} days`,
+            label: 'Improvement Score',
+            value: `${analytics?.improvement_score ?? 0}%`,
             color: 'from-green-500 to-emerald-500',
         },
     ]
@@ -125,9 +134,11 @@ export default function DashboardPage() {
                                             </div>
                                             <div>
                                                 <p className="text-gray-400 text-sm mb-1">{stat.label}</p>
-                                                <p className="text-2xl font-bold text-white">
-                                                    {loading ? '...' : stat.value}
-                                                </p>
+                                                <div className="flex items-end gap-2">
+                                                    <p className="text-2xl font-bold text-white">
+                                                        {loading ? '...' : stat.value}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </Card>
@@ -136,68 +147,117 @@ export default function DashboardPage() {
                         })}
                     </div>
 
-                    {/* Recent Activity */}
-                    <Card>
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-white">Recent Sessions</h2>
-                            <button
-                                onClick={() => router.push('/profile')}
-                                className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-                            >
-                                View All
-                            </button>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Performance Report */}
+                        <div className="lg:col-span-2">
+                            <Card className="h-full">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h2 className="text-xl font-bold text-white">Performance Report</h2>
+                                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
+                                        <TrendingUp className="w-3 h-3" />
+                                        {analytics?.confidence_trend || 'Stable'}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    {/* Confidence Chart */}
+                                    <div>
+                                        <p className="text-gray-400 text-sm mb-4">Confidence Score Trend</p>
+                                        <div className="h-48 flex items-end gap-2 px-2">
+                                            {analytics?.recent_scores?.length ? analytics.recent_scores.map((score, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ height: 0 }}
+                                                    animate={{ height: `${score}%` }}
+                                                    className="flex-1 bg-gradient-to-t from-indigo-500 to-purple-500 rounded-t-sm relative group"
+                                                >
+                                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                        {score}%
+                                                    </div>
+                                                </motion.div>
+                                            )) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm italic">
+                                                    Complete more sessions to see your trend
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex justify-between mt-2 text-[10px] text-gray-500">
+                                            <span>Oldest</span>
+                                            <span>Most Recent</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Improvement Areas */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <p className="text-gray-400 text-sm mb-3">Improvement Areas</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {analytics?.common_improvement_areas?.length ? analytics.common_improvement_areas.map((area, i) => (
+                                                    <span key={i} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs capitalize">
+                                                        {area.replace('_', ' ')}
+                                                    </span>
+                                                )) : (
+                                                    <p className="text-gray-500 text-xs italic">No data yet</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                            <p className="text-white text-sm font-medium mb-1">Learning Tip</p>
+                                            <p className="text-gray-400 text-xs leading-relaxed">
+                                                {analytics?.common_improvement_areas?.includes('grammar')
+                                                    ? 'Focus on using diverse sentence structures in your next session.'
+                                                    : 'Great job! Try to incorporate more idiomatic expressions to sound more natural.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
                         </div>
 
-                        {loading ? (
-                            <div className="space-y-4">
-                                {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="h-16 bg-white/5 rounded-lg animate-pulse" />
-                                ))}
+                        {/* Recent Activity */}
+                        <Card className="h-full">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-white">Recent Sessions</h2>
+                                <button
+                                    onClick={() => router.push('/profile')}
+                                    className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                                >
+                                    View All
+                                </button>
                             </div>
-                        ) : stats.totalSessions === 0 ? (
-                            <div className="text-center py-12">
-                                <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                                <p className="text-gray-400 mb-4">No practice sessions yet</p>
-                                <Button variant="primary" onClick={() => router.push('/setup')}>
-                                    Start Your First Session
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {/* Mock recent sessions */}
-                                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-2 h-2 rounded-full bg-green-400" />
-                                        <div>
-                                            <p className="text-white font-medium">Intermediate - Free Talk</p>
-                                            <p className="text-sm text-gray-400">2 hours ago</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-gray-400">15 min</span>
+
+                            {loading ? (
+                                <div className="space-y-4">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="h-16 bg-white/5 rounded-lg animate-pulse" />
+                                    ))}
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-2 h-2 rounded-full bg-blue-400" />
-                                        <div>
-                                            <p className="text-white font-medium">Beginner - Travel</p>
-                                            <p className="text-sm text-gray-400">Yesterday</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-gray-400">20 min</span>
+                            ) : analytics?.total_sessions === 0 ? (
+                                <div className="text-center py-12">
+                                    <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                                    <p className="text-gray-400 mb-4">No practice sessions yet</p>
+                                    <Button variant="primary" onClick={() => router.push('/setup')}>
+                                        Start Your First Session
+                                    </Button>
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-2 h-2 rounded-full bg-purple-400" />
-                                        <div>
-                                            <p className="text-white font-medium">Advanced - Business</p>
-                                            <p className="text-sm text-gray-400">2 days ago</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {/* Here you would ideally fetch and map actual sessions */}
+                                    {/* Mock for now as the analytics endpoint doesn't return full sessions */}
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-2 h-2 rounded-full bg-green-400" />
+                                            <div>
+                                                <p className="text-white font-medium text-sm">Last Session</p>
+                                                <p className="text-xs text-gray-400">Total Avg: {analytics?.avg_confidence}%</p>
+                                            </div>
                                         </div>
+                                        <span className="text-gray-400 text-sm">Score: {analytics?.recent_scores?.[0] ?? 0}%</span>
                                     </div>
-                                    <span className="text-gray-400">25 min</span>
                                 </div>
-                            </div>
-                        )}
-                    </Card>
+                            )}
+                        </Card>
+                    </div>
                 </main>
             </div>
         </ProtectedRoute>
