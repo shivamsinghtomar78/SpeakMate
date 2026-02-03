@@ -18,6 +18,16 @@ logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
+class PracticeState(TypedDict):
+    """State for the English practice LangGraph."""
+    messages: Annotated[Sequence[BaseMessage], operator.add]
+    level: str
+    topic: str
+    context: str
+    grammar_corrections: List[Dict[str, str]]
+    vocab_suggestions: List[Dict[str, str]]
+    follow_up_question: Optional[str]
+
 class FeedbackOutput(BaseModel):
     """Structured feedback from the AI partner."""
     grammar_corrections: List[Dict[str, str]] = Field(
