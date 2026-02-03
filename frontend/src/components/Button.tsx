@@ -6,13 +6,14 @@ import { motion, HTMLMotionProps } from 'framer-motion'
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
-interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> {
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'className' | 'children'> {
     variant?: ButtonVariant
     size?: ButtonSize
     fullWidth?: boolean
     loading?: boolean
     leftIcon?: React.ReactNode
     rightIcon?: React.ReactNode
+    children?: React.ReactNode
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
