@@ -213,6 +213,28 @@ async def get_vocabulary(level: Optional[str] = None, limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/voice/preview")
+async def voice_preview(data: dict):
+    """Generate a short audio preview for a voice."""
+    try:
+        voice_id = data.get("voice_id", settings.TTS_VOICE)
+        text = data.get("text", "Hello! I am your English practice partner. Let's talk!")
+        
+        # Use existing legacy TTS method which uses REST API
+        audio_content = await voice_agent.text_to_speech_with_voice(text, voice_id)
+        
+        # Return as base64 to avoid issues with raw bytes in JSON or just return audio/wav
+        import base64
+        return {
+            "audio": base64.b64encode(audio_content).decode("utf-8"),
+            "format": "linear16",
+            "sample_rate": 24000
+        }
+    except Exception as e:
+        logger.error(f"Voice preview failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ WebSocket Voice Endpoint with Deepgram Voice Agent ============
 
 @app.websocket("/ws/voice")

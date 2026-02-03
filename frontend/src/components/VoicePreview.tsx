@@ -25,28 +25,36 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
 
         setIsLoading(true)
         try {
-            // In a real app, this would call a backend endpoint that returns a sample 
-            // or uses a static sample URL. For now, we'll use a placeholder logic 
-            // with browser synthesis as a fallback or a mock delay.
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/voice/preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    voice_id: voiceId,
+                    text: `Hello! I'm ${label}. I'm excited to practice English with you!`
+                })
+            })
 
-            // Mock delay for feel
-            await new Promise(resolve => setTimeout(resolve, 800))
+            if (!response.ok) throw new Error('Failed to fetch preview')
+            const data = await response.json()
 
-            const utterance = new SpeechSynthesisUtterance("Hello! I'm your English practice partner. Let's have a great conversation.")
-            // Try to match gender roughly for preview feel
-            const voices = window.speechSynthesis.getVoices()
-            if (voiceId.includes('thalia') || voiceId.includes('athena') || voiceId.includes('stella')) {
-                utterance.voice = voices.find(v => v.name.includes('Female')) || null
+            // Create audio from base64
+            const audioBlob = await (await fetch(`data:audio/wav;base64,${data.audio}`)).blob()
+            const audioUrl = URL.createObjectURL(audioBlob)
+
+            if (audioRef.current) {
+                audioRef.current.src = audioUrl
             } else {
-                utterance.voice = voices.find(v => v.name.includes('Male')) || null
+                audioRef.current = new Audio(audioUrl)
             }
 
-            utterance.onend = () => setIsPlaying(false)
-            utterance.onstart = () => {
-                setIsLoading(false)
-                setIsPlaying(true)
+            audioRef.current.onended = () => {
+                setIsPlaying(false)
+                URL.revokeObjectURL(audioUrl)
             }
-            window.speechSynthesis.speak(utterance)
+
+            await audioRef.current.play()
+            setIsLoading(false)
+            setIsPlaying(true)
 
         } catch (error) {
             console.error('Preview failed:', error)

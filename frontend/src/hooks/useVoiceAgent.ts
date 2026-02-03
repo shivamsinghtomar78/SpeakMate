@@ -47,7 +47,7 @@ interface UseVoiceAgentReturn {
     sessionId: string | null
     progress: ProgressData | null
     error: string | null
-    connect: (level: string, topic: string, userId?: string) => void
+    connect: (level: string, topic: string, userId?: string, voiceId?: string) => void
     disconnect: () => void
     startListening: () => void
     stopListening: () => void
@@ -77,7 +77,7 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
     const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
 
     // Connect to WebSocket
-    const connect = useCallback((level: string, topic: string, userId?: string) => {
+    const connect = useCallback((level: string, topic: string, userId?: string, voiceId?: string) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             return
         }
@@ -95,6 +95,7 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
                     level,
                     topic,
                     user_id: userId,
+                    voice_id: voiceId,
                 }))
             }
 

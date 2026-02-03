@@ -14,6 +14,7 @@ function ChatContent() {
     const router = useRouter()
     const level = searchParams.get('level') || 'intermediate'
     const topic = searchParams.get('topic') || 'free_talk'
+    const voiceId = searchParams.get('voice') || 'aura-2-thalia-en'
 
     const { user } = useAuth()
     const [showFeedback, setShowFeedback] = useState(false)
@@ -40,9 +41,9 @@ function ChatContent() {
 
     // Connect on mount
     useEffect(() => {
-        connect(level, topic, user?.uid)
+        connect(level, topic, user?.uid || undefined, voiceId)
         return () => disconnect()
-    }, [level, topic, user?.uid])
+    }, [level, topic, user?.uid, voiceId, connect, disconnect])
 
     const toggleListening = useCallback(() => {
         if (isListening) {

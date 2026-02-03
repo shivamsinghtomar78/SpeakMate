@@ -346,14 +346,18 @@ class VoiceAgentService:
         logger.info("Deepgram live transcription stopped")
     
     async def text_to_speech(self, text: str) -> bytes:
-        """Generate TTS using REST API (for welcome message before agent connects)."""
+        """Generate TTS using default voice."""
+        return await self.text_to_speech_with_voice(text, settings.TTS_VOICE)
+
+    async def text_to_speech_with_voice(self, text: str, voice_id: str) -> bytes:
+        """Generate TTS using REST API with a specific voice ID."""
         import httpx
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 "https://api.deepgram.com/v1/speak",
                 params={
-                    "model": settings.TTS_VOICE,
+                    "model": voice_id,
                     "encoding": "linear16",
                     "sample_rate": "24000",
                 },
@@ -367,7 +371,7 @@ class VoiceAgentService:
             if response.status_code == 200:
                 return response.content
             else:
-                raise Exception(f"TTS failed: {response.status_code}")
+                raise Exception(f"TTS failed: {response.status_code} - {response.text}")
 
 
 # Singleton instances

@@ -6,7 +6,7 @@ import { motion, HTMLMotionProps } from 'framer-motion'
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
-interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'className' | 'children'> {
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
     variant?: ButtonVariant
     size?: ButtonSize
     fullWidth?: boolean
@@ -14,6 +14,7 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'className' | 'chi
     leftIcon?: React.ReactNode
     rightIcon?: React.ReactNode
     children?: React.ReactNode
+    className?: string
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -27,6 +28,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             rightIcon,
             children,
             disabled,
+            className: customClassName,
             ...props
         },
         ref
@@ -51,6 +53,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             ${variants[variant]}
             ${sizes[size]}
             ${fullWidth ? 'w-full' : ''}
+            ${customClassName || ''}
         `.trim()
 
         return (
