@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -18,10 +18,11 @@ export default function LoginPage() {
     const [error, setError] = useState('')
 
     // Redirect if already logged in
-    if (user) {
-        router.push('/dashboard')
-        return null
-    }
+    useEffect(() => {
+        if (user) {
+            router.replace('/dashboard')
+        }
+    }, [user, router])
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault()

@@ -73,7 +73,7 @@ export default function SetupPage() {
 
                 {/* Navigation */}
                 <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
-                    <Link href="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                    <Link href="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                         <span>Back</span>
                     </Link>

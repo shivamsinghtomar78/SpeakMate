@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -19,10 +19,11 @@ export default function SignupPage() {
     const [error, setError] = useState('')
 
     // Redirect if already logged in
-    if (user) {
-        router.push('/dashboard')
-        return null
-    }
+    useEffect(() => {
+        if (user) {
+            router.replace('/dashboard')
+        }
+    }, [user, router])
 
     const validatePassword = () => {
         if (password.length < 6) {
@@ -158,10 +159,10 @@ export default function SignupPage() {
                                         <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                                             <div
                                                 className={`h-full transition-all ${passwordStrength.strength === 1
-                                                        ? 'w-1/3 bg-red-400'
-                                                        : passwordStrength.strength === 2
-                                                            ? 'w-2/3 bg-yellow-400'
-                                                            : 'w-full bg-green-400'
+                                                    ? 'w-1/3 bg-red-400'
+                                                    : passwordStrength.strength === 2
+                                                        ? 'w-2/3 bg-yellow-400'
+                                                        : 'w-full bg-green-400'
                                                     }`}
                                             />
                                         </div>
