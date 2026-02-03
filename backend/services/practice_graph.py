@@ -16,16 +16,20 @@ from models.schemas import ProficiencyLevel
 
 logger = logging.getLogger(__name__)
 
-class PracticeState(TypedDict):
-    """State of the practice session."""
-    messages: Annotated[Sequence[BaseMessage], operator.add]
-    level: str
-    topic: str
-    context: str
-    # Structured feedback
-    grammar_corrections: List[Dict[str, Any]]
-    vocab_suggestions: List[Dict[str, Any]]
-    follow_up_question: Optional[str]
+from pydantic import BaseModel, Field
+
+class FeedbackOutput(BaseModel):
+    """Structured feedback from the AI partner."""
+    grammar_corrections: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="List of corrections with 'original', 'corrected', and 'explanation'"
+    )
+    vocab_suggestions: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="List of suggestions with 'word', 'definition', and 'usage'"
+    )
+    follow_up_question: str = Field(description="The follow-up question to keep the conversation going")
+    fluency_score: int = Field(description="A score from 0-100 indicating the user's fluency in this turn")
 
 class PracticeGraph:
     """Orchestrates English practice sessions using LangGraph."""
@@ -37,6 +41,9 @@ class PracticeGraph:
             temperature=settings.TEMPERATURE,
             max_tokens=settings.MAX_TOKENS,
         )
+        
+        # Specialized LLM for structural extraction
+        self.structured_llm = self.llm.with_structured_output(FeedbackOutput)
         
         # Build the graph
         workflow = StateGraph(PracticeState)
@@ -83,23 +90,41 @@ class PracticeGraph:
 
     @traceable(name="analyze_feedback")
     async def analyze_feedback(self, state: PracticeState):
-        """Node: Extract feedback and follow-up from the response."""
-        # In a real LangGraph, this could be another LLM call to extract structured data
-        # For now, we'll use a simple extraction or a dedicated prompt if response is empty
+        """Node: Extract feedback and follow-up from the response using structured output."""
         last_ai_message = state["messages"][-1].content
         
-        # Simple extraction logic (can be expanded)
-        follow_up = None
-        if "?" in last_ai_message:
-            parts = last_ai_message.split("?")
-            if len(parts) > 1:
-                follow_up = parts[-2].split(".")[-1].strip() + "?"
+        # Find the last user message to compare for feedback
+        user_messages = [m for m in state["messages"] if isinstance(m, HumanMessage)]
+        last_user_input = user_messages[-1].content if user_messages else ""
+        
+        prompt = f"""You are an English linguistic analyst. 
+Based on the conversation and the AI's response, extract structured feedback.
 
-        return {
-            "follow_up_question": follow_up,
-            "grammar_corrections": [],
-            "vocab_suggestions": []
-        }
+USER SAID: {last_user_input}
+AI RESPONDED: {last_ai_message}
+
+Extract:
+1. Any grammar corrections the AI made or should have made.
+2. Any useful vocabulary suggestions.
+3. The specific follow-up question the AI asked.
+4. An estimated fluency score (0-100) based on the user's input.
+"""
+        try:
+            feedback = await self.structured_llm.ainvoke(prompt)
+            return {
+                "follow_up_question": feedback.follow_up_question,
+                "grammar_corrections": feedback.grammar_corrections,
+                "vocab_suggestions": feedback.vocab_suggestions
+            }
+        except Exception as e:
+            logger.error(f"Error in analyze_feedback node: {e}")
+            # Fallback to simple extraction
+            follow_up = last_ai_message.split('?')[-2].strip() + '?' if '?' in last_ai_message else None
+            return {
+                "follow_up_question": follow_up,
+                "grammar_corrections": [],
+                "vocab_suggestions": []
+            }
 
     def _build_system_prompt(self, level: str, topic: str, context: str) -> str:
         """Create a targeted system prompt."""

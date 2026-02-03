@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { ChevronRight, BookOpen, Briefcase, Plane, GraduationCap, MessageCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { VoicePreview } from '@/components/VoicePreview'
 
 const levels = [
     {
@@ -242,15 +243,18 @@ export default function SetupPage() {
                                             `}>
                                                 <span className="text-white text-lg font-bold">{v.gender[0]}</span>
                                             </div>
-                                            {voice === v.id && (
-                                                <motion.div
-                                                    initial={{ scale: 0 }}
-                                                    animate={{ scale: 1 }}
-                                                    className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center"
-                                                >
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-white shadow-sm" />
-                                                </motion.div>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <VoicePreview voiceId={v.id} label={v.label} />
+                                                {voice === v.id && (
+                                                    <motion.div
+                                                        initial={{ scale: 0 }}
+                                                        animate={{ scale: 1 }}
+                                                        className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center"
+                                                    >
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-white shadow-sm" />
+                                                    </motion.div>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <h3 className="text-xl font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors">

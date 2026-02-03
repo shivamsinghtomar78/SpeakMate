@@ -10,7 +10,6 @@ class Settings:
     # API Keys
     DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     # Qubrid AI (for RAG semantic selection)
     QUBRID_API_KEY: str = os.getenv("QUBRID_API_KEY", "")
     QUBRID_MODEL: str = os.getenv("QUBRID_MODEL", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16")

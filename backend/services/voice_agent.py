@@ -1,5 +1,6 @@
 """Deepgram Voice Agent service using the Voice Agent V1 API for real-time conversation."""
 import asyncio
+import os
 import json
 import logging
 import base64
@@ -152,9 +153,8 @@ Be warm, patient, and supportive. Focus on helping them improve their English sp
                         "temperature": 0.7
                     },
                     "endpoint": {
-                        "url": "https://api.groq.com/openai/v1/chat/completions",
+                        "url": f"{os.getenv('APP_URL', 'http://localhost:8000')}/api/llm/think",
                         "headers": {
-                            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
                             "Content-Type": "application/json"
                         }
                     },

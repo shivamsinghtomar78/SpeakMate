@@ -61,15 +61,16 @@ class Database:
             IndexModel([("session_id", ASCENDING)]),
         ])
         
-        # Learning materials indexes
         await self.db.grammar_rules.create_indexes([
             IndexModel([("topic", ASCENDING)]),
             IndexModel([("level", ASCENDING)]),
+            IndexModel([("topic", "text"), ("content", "text")]),
         ])
         
         await self.db.vocabulary.create_indexes([
             IndexModel([("word", ASCENDING)]),
             IndexModel([("level", ASCENDING)]),
+            IndexModel([("word", "text"), ("definition", "text")]),
         ])
         
         logger.info("Database indexes created")

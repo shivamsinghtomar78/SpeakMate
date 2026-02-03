@@ -17,8 +17,6 @@ function ChatContent() {
 
     const { user } = useAuth()
     const [showFeedback, setShowFeedback] = useState(false)
-    const [isAISpeaking, setIsAISpeaking] = useState(false)
-
     const {
         isConnected,
         isListening,
@@ -26,11 +24,19 @@ function ChatContent() {
         feedback,
         sessionId,
         error,
+        isAISpeaking,
+        audioData,
         connect,
         disconnect,
         startListening,
         stopListening,
     } = useVoiceAgent()
+
+    // Calculate volume for visualization
+    const averageFrequency = audioData.length > 0
+        ? Array.from(audioData).reduce((a, b) => a + b, 0) / audioData.length
+        : 0
+    const volumeBoost = isListening ? (averageFrequency / 128) * 0.5 : 0
 
     // Connect on mount
     useEffect(() => {
@@ -53,8 +59,10 @@ function ChatContent() {
         <main className="h-screen bg-gradient-to-br from-[#0a0a0f] via-[#0f0f1a] to-[#1a1025] flex flex-col overflow-hidden">
             {/* Background Effects */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/3 left-1/3 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-3xl" />
-                <div className="absolute bottom-1/3 right-1/3 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-3xl" />
+                <div className="absolute top-1/3 left-1/3 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-3xl transition-all duration-1000"
+                    style={{ transform: `scale(${1 + volumeBoost * 2})`, opacity: isListening ? 0.3 + volumeBoost : 0.1 }} />
+                <div className="absolute bottom-1/3 right-1/3 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-3xl transition-all duration-1000"
+                    style={{ transform: `scale(${1 + volumeBoost * 1.5})`, opacity: isListening ? 0.3 + volumeBoost : 0.1 }} />
             </div>
 
             {/* Top Bar */}
@@ -89,49 +97,54 @@ function ChatContent() {
                 {/* Center Area - Orb and Controls */}
                 <div className="flex-1 flex flex-col items-center justify-center px-4">
                     {/* 3D Animated Orb */}
-                    <motion.div
-                        className="relative mb-8"
-                        animate={{
-                            scale: isListening ? [1, 1.05, 1] : 1,
-                        }}
-                        transition={{
-                            duration: 2,
-                            repeat: isListening ? Infinity : 0,
-                            ease: "easeInOut"
-                        }}
-                    >
-                        <div className={`relative w-48 h-48 md:w-64 md:h-64 transition-all duration-500 ${isListening ? 'scale-110' : ''}`}>
+                    <div className="relative mb-8">
+                        <motion.div
+                            className={`relative w-48 h-48 md:w-64 md:h-64 transition-all duration-150`}
+                            animate={{
+                                scale: isListening ? 1 + volumeBoost : 1,
+                            }}
+                        >
                             {/* Outer rings when listening */}
                             {isListening && (
                                 <>
                                     <motion.div
                                         className="absolute inset-0 rounded-full border-2 border-indigo-500/30"
-                                        animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-                                        transition={{ duration: 2, repeat: Infinity }}
+                                        animate={{
+                                            scale: [1, 1.2 + volumeBoost],
+                                            opacity: [0.5, 0],
+                                            borderWidth: [2, 0]
+                                        }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
                                     />
                                     <motion.div
                                         className="absolute inset-0 rounded-full border-2 border-purple-500/30"
-                                        animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-                                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                                        animate={{
+                                            scale: [1, 1.3 + volumeBoost],
+                                            opacity: [0.5, 0],
+                                            borderWidth: [2, 0]
+                                        }}
+                                        transition={{ duration: 1.5, repeat: Infinity, delay: 0.3 }}
                                     />
                                 </>
                             )}
 
                             {/* Glow */}
-                            <div className={`absolute inset-0 rounded-full blur-3xl transition-all duration-500 ${isListening
-                                ? 'bg-gradient-to-br from-indigo-500/40 to-purple-600/40'
+                            <div className={`absolute inset-0 rounded-full blur-3xl transition-all duration-300 ${isListening
+                                ? 'bg-gradient-to-br from-indigo-500/50 to-purple-600/50'
                                 : 'bg-gradient-to-br from-indigo-500/20 to-purple-600/20'
-                                }`} />
+                                }`}
+                                style={{ transform: `scale(${1 + volumeBoost})` }}
+                            />
 
                             {/* Main Orb */}
                             <motion.div
                                 className="absolute inset-4 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-2xl shadow-purple-500/50 overflow-hidden"
                                 animate={{
                                     boxShadow: isListening
-                                        ? ['0 25px 50px -12px rgba(168, 85, 247, 0.5)', '0 25px 50px -12px rgba(99, 102, 241, 0.5)']
+                                        ? [`0 25px ${50 + volumeBoost * 100}px -12px rgba(168, 85, 247, ${0.5 + volumeBoost})`, `0 25px ${50 + volumeBoost * 100}px -12px rgba(99, 102, 241, ${0.5 + volumeBoost})`]
                                         : '0 25px 50px -12px rgba(168, 85, 247, 0.25)'
                                 }}
-                                transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
+                                transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
                             >
                                 {/* Inner gradient */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20" />
@@ -141,21 +154,21 @@ function ChatContent() {
 
                                 {/* Audio visualization bars */}
                                 {isListening && (
-                                    <div className="absolute inset-0 flex items-center justify-center gap-1">
-                                        {[...Array(5)].map((_, i) => (
-                                            <motion.div
-                                                key={i}
-                                                className="w-2 bg-white/80 rounded-full"
-                                                animate={{
-                                                    height: [8, 24 + Math.random() * 16, 8],
-                                                }}
-                                                transition={{
-                                                    duration: 0.5,
-                                                    repeat: Infinity,
-                                                    delay: i * 0.1,
-                                                }}
-                                            />
-                                        ))}
+                                    <div className="absolute inset-0 flex items-center justify-center gap-1 px-8">
+                                        {[...Array(8)].map((_, i) => {
+                                            const freqIndex = Math.floor((i / 8) * audioData.length)
+                                            const freqValue = audioData[freqIndex] || 0
+                                            const height = 10 + (freqValue / 255) * 60
+
+                                            return (
+                                                <motion.div
+                                                    key={i}
+                                                    className="w-1.5 md:w-2 bg-white/80 rounded-full"
+                                                    style={{ height: `${height}%` }}
+                                                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                                />
+                                            )
+                                        })}
                                     </div>
                                 )}
 
@@ -166,8 +179,8 @@ function ChatContent() {
                                     </div>
                                 )}
                             </motion.div>
-                        </div>
-                    </motion.div>
+                        </motion.div>
+                    </div>
 
                     {/* Status Text */}
                     <motion.p

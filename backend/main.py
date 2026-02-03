@@ -413,24 +413,31 @@ async def llm_think(request: Dict[str, Any]):
     try:
         messages_raw = request.get("messages", [])
         
-        # Extract metadata from last message if it's a JSON string (Deepgram sometimes does this) or context
-        # Otherwise, use defaults
+        # Extract metadata from system prompt or defaults
         level = "intermediate"
         topic = "free_talk"
         
-        # Map to LangChain messages
         history = []
         user_input = ""
+        
         for msg in messages_raw:
             role = msg.get("role")
             content = msg.get("content", "")
-            if role == "user":
+            if role == "system":
+                # Try to extract level and topic from our own prompt format
+                if "USER LEVEL: BEGINNER" in content: level = "beginner"
+                elif "USER LEVEL: ADVANCED" in content: level = "advanced"
+                
+                if "TOPIC: daily_life" in content: topic = "daily_life"
+                elif "TOPIC: business" in content: topic = "business"
+                elif "TOPIC: travel" in content: topic = "travel"
+                elif "TOPIC: academic" in content: topic = "academic"
+            elif role == "user":
                 user_input = content
             elif role == "assistant":
                 history.append(AIMessage(content=content))
-            # System messages are handled by the graph
-            
-        # Run LangGraph via the same logic as LLMService or direct call
+                
+        # Run LangGraph
         from services.practice_graph import practice_graph
         result = await practice_graph.run(
             user_input=user_input,

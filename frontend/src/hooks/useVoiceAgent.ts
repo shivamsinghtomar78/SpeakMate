@@ -52,6 +52,8 @@ interface UseVoiceAgentReturn {
     startListening: () => void
     stopListening: () => void
     sendTextMessage: (text: string) => void
+    isAISpeaking: boolean
+    audioData: Uint8Array
 }
 
 export function useVoiceAgent(): UseVoiceAgentReturn {
@@ -62,6 +64,8 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [progress, setProgress] = useState<ProgressData | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [isAISpeaking, setIsAISpeaking] = useState(false)
+    const [audioData, setAudioData] = useState<Uint8Array>(new Uint8Array(0))
 
     const wsRef = useRef<WebSocket | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
@@ -229,8 +233,26 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             })
 
             const source = audioContextRef.current.createMediaStreamSource(stream)
+
+            // Create analyser for visualization
+            const analyser = audioContextRef.current.createAnalyser()
+            analyser.fftSize = 256
+            source.connect(analyser)
+
             const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1)
             processorRef.current = processor
+
+            // Update frequency data in a loop
+            const bufferLength = analyser.frequencyBinCount
+            const dataArray = new Uint8Array(bufferLength)
+
+            const updateFrequencyData = () => {
+                if (!isListeningRef.current) return
+                analyser.getByteFrequencyData(dataArray)
+                setAudioData(new Uint8Array(dataArray))
+                requestAnimationFrame(updateFrequencyData)
+            }
+            updateFrequencyData()
 
             // Set listening state BEFORE creating the callback
             setIsListening(true)
@@ -318,9 +340,14 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
     }, [])
 
     // Play audio from base64
+    const playbackContextRef = useRef<AudioContext | null>(null)
+
     const playAudio = useCallback(async (base64Audio: string, sampleRate: number) => {
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+            if (!playbackContextRef.current) {
+                playbackContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+            }
+            const audioContext = playbackContextRef.current
 
             // Decode base64 to array buffer
             const binaryString = atob(base64Audio)
@@ -342,10 +369,17 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             const source = audioContext.createBufferSource()
             source.buffer = audioBuffer
             source.connect(audioContext.destination)
+
+            source.onended = () => {
+                setIsAISpeaking(false)
+            }
+
+            setIsAISpeaking(true)
             source.start()
 
         } catch (e) {
             console.error('Failed to play audio:', e)
+            setIsAISpeaking(false)
         }
     }, [])
 
@@ -369,5 +403,7 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
         startListening,
         stopListening,
         sendTextMessage,
+        isAISpeaking,
+        audioData,
     }
 }

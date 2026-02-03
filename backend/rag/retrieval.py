@@ -1,7 +1,6 @@
-"""RAG retrieval system for learning materials."""
 import logging
+import httpx
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
 
 from config import settings
 from models.database import db
@@ -13,35 +12,15 @@ class RAGRetrieval:
     """RAG system for retrieving relevant learning materials."""
     
     def __init__(self):
-        self.embedding_model = None
+        self.use_qubrid = False
         
     async def initialize(self):
         """Initialize retrieval settings."""
         if settings.QUBRID_API_KEY:
             logger.info(f"Qubrid AI initialized with model: {settings.QUBRID_MODEL}")
             self.use_qubrid = True
-        elif settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.embedding_model = "models/embedding-001"
-            logger.info("Gemini embedding model initialized")
         else:
-            logger.warning("No API key for RAG - using keyword-based retrieval")
-    
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
-        """Generate embeddings (Gemini only)."""
-        if not self.embedding_model:
-            return None
-        # ... existing gemini code ...
-        try:
-            result = genai.embed_content(
-                model=self.embedding_model,
-                content=text,
-                task_type="retrieval_query",
-            )
-            return result['embedding']
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {e}")
-            return None
+            logger.warning("No Qubrid API key - using keyword-based retrieval only")
 
     async def _call_qubrid(self, prompt: str) -> Optional[str]:
         """Call Qubrid AI for semantic tasks."""
@@ -111,47 +90,6 @@ class RAGRetrieval:
         
         return "\n".join(context_parts) if context_parts else ""
     
-    async def _search_vector(
-        self,
-        query_text: str,
-        collection_name: str,
-        level: Optional[str] = None,
-        limit: int = 3
-    ) -> List[Dict[str, Any]]:
-        """Perform vector search using embeddings."""
-        if not self.embedding_model or not settings.VECTOR_SEARCH_ENABLED:
-            return []
-            
-        query_embedding = await self.get_embedding(query_text)
-        if not query_embedding:
-            return []
-            
-        try:
-            # MongoDB Atlas Vector Search Pipeline
-            pipeline = [
-                {
-                    "$vectorSearch": {
-                        "index": "vector_index",
-                        "path": "embedding",
-                        "queryVector": query_embedding,
-                        "numCandidates": 100,
-                        "limit": limit
-                    }
-                }
-            ]
-            
-            if level:
-                # Add filter for level if provided
-                # Note: Atlas Vector Search filter requires specific index configuration
-                pipeline.append({"$match": {"level": level}})
-            
-            cursor = db.db[collection_name].aggregate(pipeline)
-            results = await cursor.to_list(length=limit)
-            return results
-        except Exception as e:
-            logger.warning(f"Vector search failed (likely index not configured): {e}")
-            # Fallback will be handled by the caller
-            return []
 
     async def _get_relevant_grammar(
         self, 
@@ -159,34 +97,17 @@ class RAGRetrieval:
         level: str,
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Get relevant grammar rules."""
-        # 1. Try Qubrid AI for semantic selection if available
-        if hasattr(self, 'use_qubrid') and self.use_qubrid:
-            # Get common rules first to provide as context to the LLM
-            all_rules = await db.get_grammar_rules(level=level)
-            if all_rules:
-                rule_list = "\n".join([f"- {r.get('topic')}: {r.get('content')}" for r in all_rules[:15]])
-                prompt = f"""Given the user input: "{user_input}"
-Select the top {limit} most relevant grammar rules from this list that would help the user improve:
-{rule_list}
-Return ONLY the topics of the selected rules, separated by commas."""
-                
-                selected_topics = await self._call_qubrid(prompt)
-                if selected_topics:
-                    topics = [t.strip() for t in selected_topics.split(',')]
-                    cursor = db.db.grammar_rules.find({"topic": {"$in": topics}}).limit(limit)
-                    rules = await cursor.to_list(length=limit)
-                    if rules:
-                        return rules
-
-        # 2. Try Vector Search if enabled and Gemini is active
-        if settings.VECTOR_SEARCH_ENABLED and self.embedding_model:
-            vector_results = await self._search_vector(user_input, "grammar_rules", level, limit)
-            if vector_results:
-                return vector_results
-
-        # 3. Fallback to Keyword Search
-        # ... existing keyword logic ...
+    async def _get_relevant_grammar(
+        self, 
+        user_input: str, 
+        level: str,
+        limit: int
+    ) -> List[Dict[str, Any]]:
+        """Get relevant grammar rules with semantic re-ranking."""
+        # 1. Fetch initial candidate pool
+        candidates = []
+        
+        # Keyword based pool
         grammar_keywords = {
             "tense": ["was", "were", "have", "had", "will", "going to", "did", "does"],
             "articles": ["a", "an", "the"],
@@ -196,52 +117,49 @@ Return ONLY the topics of the selected rules, separated by commas."""
         }
         
         user_lower = user_input.lower()
-        relevant_topics = []
-        for topic, keywords in grammar_keywords.items():
-            if any(kw in user_lower for kw in keywords):
-                relevant_topics.append(topic)
+        relevant_topics = [t for t, kws in grammar_keywords.items() if any(kw in user_lower for kw in kws)]
         
         if relevant_topics:
-            query = {"level": level, "topic": {"$in": relevant_topics}}
-            cursor = db.db.grammar_rules.find(query).limit(limit)
-            rules = await cursor.to_list(length=limit)
-            if rules:
-                return rules
-        
-        return await db.get_grammar_rules(level=level)
-    
+            cursor = db.db.grammar_rules.find({"level": level, "topic": {"$in": relevant_topics}}).limit(10)
+            candidates.extend(await cursor.to_list(length=10))
+            
+        # Add diverse rules to pool if not enough
+        if len(candidates) < 10:
+            cursor = db.db.grammar_rules.find({"level": level}).limit(20)
+            candidates.extend(await cursor.to_list(length=20))
+
+        # 2. Semantic Re-ranking with Qubrid
+        if self.use_qubrid and candidates:
+            # Deduplicate by topic
+            unique_candidates = {c['topic']: c for c in candidates}.values()
+            rule_list = "\n".join([f"- {r.get('topic')}: {r.get('content')}" for r in unique_candidates])
+            
+            prompt = f"""Given the user speaking: "{user_input}"
+Select the top {limit} most relevant grammar rules from this list to help them improve:
+{rule_list}
+Return ONLY the topics of the selected rules, separated by commas."""
+            
+            selected_topics_str = await self._call_qubrid(prompt)
+            if selected_topics_str:
+                selected_topics = [t.strip() for t in selected_topics_str.split(',')]
+                # Re-order candidates based on LLM choice
+                ranked = [c for c in unique_candidates if c['topic'] in selected_topics]
+                if ranked:
+                    return ranked[:limit]
+
+        return candidates[:limit]
+
     async def _get_relevant_vocabulary(
         self,
         user_input: str,
         level: str,
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Get relevant vocabulary suggestions."""
-        # 1. Try Qubrid AI for semantic selection
-        if hasattr(self, 'use_qubrid') and self.use_qubrid:
-            all_vocab = await db.get_vocabulary(level=level, limit=20)
-            if all_vocab:
-                vocab_list = "\n".join([f"- {v.get('word')}: {v.get('definition')}" for v in all_vocab])
-                prompt = f"""Given the user input: "{user_input}"
-Select the top {limit} most relevant vocabulary words from this list:
-{vocab_list}
-Return ONLY the words, separated by commas."""
-                
-                selected_words = await self._call_qubrid(prompt)
-                if selected_words:
-                    words = [w.strip() for w in selected_words.split(',')]
-                    cursor = db.db.vocabulary.find({"word": {"$in": words}}).limit(limit)
-                    vocab = await cursor.to_list(length=limit)
-                    if vocab:
-                        return vocab
-
-        # 2. Try Vector Search
-        if settings.VECTOR_SEARCH_ENABLED and self.embedding_model:
-            vector_results = await self._search_vector(user_input, "vocabulary", level, limit)
-            if vector_results:
-                return vector_results
-
-        # 3. Keyword Match
+        """Get relevant vocabulary suggestions with semantic re-ranking."""
+        # 1. Fetch initial candidate pool
+        candidates = []
+        
+        # Keyword-based pool
         words = user_input.lower().split()
         topic_keywords = {
             "business": ["work", "job", "office", "meeting", "boss", "company"],
@@ -250,19 +168,35 @@ Return ONLY the words, separated by commas."""
             "academic": ["study", "learn", "school", "book", "read", "write"],
         }
         
-        detected_topics = []
-        for topic, keywords in topic_keywords.items():
-            if any(kw in words for kw in keywords):
-                detected_topics.append(topic)
+        detected_topics = [t for t, kws in topic_keywords.items() if any(kw in words for kw in kws)]
         
         if detected_topics:
-            query = {"level": level, "topic": {"$in": detected_topics}}
-            cursor = db.db.vocabulary.find(query).limit(limit)
-            vocab = await cursor.to_list(length=limit)
-            if vocab:
-                return vocab
+            cursor = db.db.vocabulary.find({"level": level, "topic": {"$in": detected_topics}}).limit(10)
+            candidates.extend(await cursor.to_list(length=10))
+            
+        # Fill pool
+        if len(candidates) < 10:
+            cursor = db.db.vocabulary.find({"level": level}).limit(20)
+            candidates.extend(await cursor.to_list(length=20))
+
+        # 2. Semantic Re-ranking
+        if self.use_qubrid and candidates:
+            unique_candidates = {v['word']: v for v in candidates}.values()
+            vocab_list = "\n".join([f"- {v.get('word')}: {v.get('definition')}" for v in unique_candidates])
+            
+            prompt = f"""Given the user speaking: "{user_input}"
+Select the top {limit} most relevant vocabulary words from this list:
+{vocab_list}
+Return ONLY the words, separated by commas."""
+            
+            selected_words_str = await self._call_qubrid(prompt)
+            if selected_words_str:
+                selected_words = [w.strip() for w in selected_words_str.split(',')]
+                ranked = [v for v in unique_candidates if v['word'] in selected_words]
+                if ranked:
+                    return ranked[:limit]
         
-        return await db.get_vocabulary(level=level, limit=limit)
+        return candidates[:limit]
     
     async def _get_pronunciation_guides(
         self,
@@ -299,13 +233,6 @@ Return ONLY the words, separated by commas."""
         material: Dict[str, Any]
     ) -> str:
         """Add new learning material to the database."""
-        # Generate embedding for the content if available
-        content = material.get("content", "") or material.get("definition", "")
-        if content and self.embedding_model:
-            embedding = await self.get_embedding(content)
-            if embedding:
-                material["embedding"] = embedding
-        
         result = await db.db[collection].insert_one(material)
         return str(result.inserted_id)
 
