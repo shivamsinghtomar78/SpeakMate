@@ -340,8 +340,52 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
         }
     }, [])
 
-    // Play audio from base64
+    // Play audio from base64 with queuing
     const playbackContextRef = useRef<AudioContext | null>(null)
+    const nextStartTimeRef = useRef<number>(0)
+    const audioQueueRef = useRef<AudioBuffer[]>([])
+    const isProcessingQueueRef = useRef<boolean>(false)
+
+    const processAudioQueue = useCallback(async () => {
+        if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) {
+            return
+        }
+
+        isProcessingQueueRef.current = true
+        if (!playbackContextRef.current) {
+            playbackContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+        }
+        const audioContext = playbackContextRef.current
+
+        while (audioQueueRef.current.length > 0) {
+            const audioBuffer = audioQueueRef.current.shift()!
+
+            const source = audioContext.createBufferSource()
+            source.buffer = audioBuffer
+            source.connect(audioContext.destination)
+
+            // Calculate start time
+            let startTime = nextStartTimeRef.current
+            const currentTime = audioContext.currentTime
+
+            // If we've fallen behind, start from now
+            if (startTime < currentTime) {
+                startTime = currentTime + 0.1 // Small buffer
+            }
+
+            source.start(startTime)
+            nextStartTimeRef.current = startTime + audioBuffer.duration
+            setIsAISpeaking(true)
+
+            // When the last scheduled buffer ends, set isAISpeaking to false
+            source.onended = () => {
+                if (audioContext.currentTime >= nextStartTimeRef.current - 0.05) {
+                    setIsAISpeaking(false)
+                }
+            }
+        }
+        isProcessingQueueRef.current = false
+    }, [])
 
     const playAudio = useCallback(async (base64Audio: string, sampleRate: number) => {
         try {
@@ -366,23 +410,15 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
                 channelData[i] = int16Array[i] / 32768.0
             }
 
-            // Play the audio
-            const source = audioContext.createBufferSource()
-            source.buffer = audioBuffer
-            source.connect(audioContext.destination)
-
-            source.onended = () => {
-                setIsAISpeaking(false)
-            }
-
-            setIsAISpeaking(true)
-            source.start()
+            // Add to queue and process
+            audioQueueRef.current.push(audioBuffer)
+            processAudioQueue()
 
         } catch (e) {
             console.error('Failed to play audio:', e)
             setIsAISpeaking(false)
         }
-    }, [])
+    }, [processAudioQueue])
 
     // Cleanup on unmount
     useEffect(() => {

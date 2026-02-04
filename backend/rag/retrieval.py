@@ -97,12 +97,6 @@ class RAGRetrieval:
         level: str,
         limit: int
     ) -> List[Dict[str, Any]]:
-    async def _get_relevant_grammar(
-        self, 
-        user_input: str, 
-        level: str,
-        limit: int
-    ) -> List[Dict[str, Any]]:
         """Get relevant grammar rules with semantic re-ranking."""
         # 1. Fetch initial candidate pool
         candidates = []
