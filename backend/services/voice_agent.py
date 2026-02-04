@@ -153,7 +153,7 @@ Be warm, patient, and supportive. Focus on helping them improve their English sp
                         "temperature": 0.7
                     },
                     "endpoint": {
-                        "url": f"{os.getenv('APP_URL', 'http://localhost:8000')}/api/llm/think",
+                        "url": f"{settings.APP_URL}/api/llm/think",
                         "headers": {
                             "Content-Type": "application/json"
                         }

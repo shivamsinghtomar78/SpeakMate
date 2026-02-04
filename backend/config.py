@@ -24,6 +24,7 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    APP_URL: str = os.getenv("APP_URL") or os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
     
     # Deepgram Settings
     DEEPGRAM_MODEL: str = "nova-3"
