@@ -15,6 +15,9 @@ class Settings:
     QUBRID_MODEL: str = os.getenv("QUBRID_MODEL", "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16")
     QUBRID_ENDPOINT: str = os.getenv("QUBRID_ENDPOINT", "https://platform.qubrid.com/api/v1/qubridai/chat/completions")
     
+    # Shared secret for authentication
+    AUTH_SECRET: str = os.getenv("AUTH_SECRET", "aura-2-tha")
+    
     # MongoDB
     MONGODB_URI: str = os.getenv("MONGODB_URI", "")
     DATABASE_NAME: str = os.getenv("DATABASE_NAME", "SpeakMate")
