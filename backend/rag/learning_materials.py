@@ -143,21 +143,21 @@ DEFAULT_GRAMMAR_RULES = [
 
 DEFAULT_VOCABULARY = [
     # Beginner
-    {"word": "appreciate", "definition": "To be thankful for something", "level": "beginner", "usage": "I really appreciate your help.", "pronunciation": "/əˈpriːʃieɪt/"},
-    {"word": "convenient", "definition": "Easy to use or suitable for your needs", "level": "beginner", "usage": "This location is very convenient for shopping.", "pronunciation": "/kənˈviːniənt/"},
-    {"word": "experience", "definition": "Knowledge or skill from doing something", "level": "beginner", "usage": "I have five years of experience in teaching.", "pronunciation": "/ɪkˈspɪəriəns/"},
+    {"word": "appreciate", "definition": "To be thankful for something", "level": "beginner", "usage": "I really appreciate your help.", "pronunciation": "/əˈpriːʃieɪt/", "topic": "daily"},
+    {"word": "convenient", "definition": "Easy to use or suitable for your needs", "level": "beginner", "usage": "This location is very convenient for shopping.", "pronunciation": "/kənˈviːniənt/", "topic": "daily"},
+    {"word": "experience", "definition": "Knowledge or skill from doing something", "level": "beginner", "usage": "I have five years of experience in teaching.", "pronunciation": "/ɪkˈspɪəriəns/", "topic": "academic"},
     
     # Intermediate
-    {"word": "accomplish", "definition": "To succeed in doing something", "level": "intermediate", "usage": "She accomplished all her goals this year.", "pronunciation": "/əˈkʌmplɪʃ/"},
-    {"word": "collaborate", "definition": "To work together with others", "level": "intermediate", "usage": "We need to collaborate on this project.", "pronunciation": "/kəˈlæbəreɪt/"},
-    {"word": "implement", "definition": "To put a plan or system into action", "level": "intermediate", "usage": "The company will implement new policies next month.", "pronunciation": "/ˈɪmplɪment/"},
-    {"word": "perspective", "definition": "A particular way of thinking about something", "level": "intermediate", "usage": "From my perspective, this is the best solution.", "pronunciation": "/pəˈspektɪv/"},
+    {"word": "accomplish", "definition": "To succeed in doing something", "level": "intermediate", "usage": "She accomplished all her goals this year.", "pronunciation": "/əˈkʌmplɪʃ/", "topic": "academic"},
+    {"word": "collaborate", "definition": "To work together with others", "level": "intermediate", "usage": "We need to collaborate on this project.", "pronunciation": "/kəˈlæbəreɪt/", "topic": "business"},
+    {"word": "implement", "definition": "To put a plan or system into action", "level": "intermediate", "usage": "The company will implement new policies next month.", "pronunciation": "/ˈɪmplɪment/", "topic": "business"},
+    {"word": "perspective", "definition": "A particular way of thinking about something", "level": "intermediate", "usage": "From my perspective, this is the best solution.", "pronunciation": "/pəˈspektɪv/", "topic": "academic"},
     
     # Advanced
-    {"word": "serendipity", "definition": "Finding something good by chance", "level": "advanced", "usage": "Meeting her was pure serendipity.", "pronunciation": "/ˌserənˈdɪpɪti/"},
-    {"word": "ephemeral", "definition": "Lasting for a very short time", "level": "advanced", "usage": "Fame can be ephemeral in the digital age.", "pronunciation": "/ɪˈfemərəl/"},
-    {"word": "ubiquitous", "definition": "Present everywhere", "level": "advanced", "usage": "Smartphones have become ubiquitous in modern society.", "pronunciation": "/juːˈbɪkwɪtəs/"},
-    {"word": "meticulous", "definition": "Very careful and precise", "level": "advanced", "usage": "She is meticulous about her research.", "pronunciation": "/məˈtɪkjʊləs/"},
+    {"word": "serendipity", "definition": "Finding something good by chance", "level": "advanced", "usage": "Meeting her was pure serendipity.", "pronunciation": "/ˌserənˈdɪpɪti/", "topic": "daily"},
+    {"word": "ephemeral", "definition": "Lasting for a very short time", "level": "advanced", "usage": "Fame can be ephemeral in the digital age.", "pronunciation": "/ɪˈfemərəl/", "topic": "academic"},
+    {"word": "ubiquitous", "definition": "Present everywhere", "level": "advanced", "usage": "Smartphones have become ubiquitous in modern society.", "pronunciation": "/juːˈbɪkwɪtəs/", "topic": "daily"},
+    {"word": "meticulous", "definition": "Very careful and precise", "level": "advanced", "usage": "She is meticulous about her research.", "pronunciation": "/məˈtkjʊləs/", "topic": "academic"},
 ]
 
 

@@ -82,7 +82,7 @@ export default function FeedbackPanel({ feedback }: FeedbackPanelProps) {
                                             <div key={i} className="text-sm space-y-1">
                                                 <p className="text-gray-300">
                                                     <span className="line-through text-red-400">{correction.original}</span>
-                                                    {' → '}
+                                                    {' \u2192 '}
                                                     <span className="text-green-400">{correction.corrected}</span>
                                                 </p>
                                                 <p className="text-gray-500 text-xs">{correction.explanation}</p>
@@ -142,7 +142,8 @@ export default function FeedbackPanel({ feedback }: FeedbackPanelProps) {
                                 {item.follow_up_question && (
                                     <div className="p-3 bg-accent-900/20 rounded-lg border border-accent-500/30">
                                         <p className="text-sm text-accent-300 font-medium">
-                                            💬 {item.follow_up_question}
+                                            <span role="img" aria-label="thought-balloon" className="mr-1">💬</span>
+                                            {item.follow_up_question}
                                         </p>
                                     </div>
                                 )}

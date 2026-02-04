@@ -1,6 +1,16 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { WSIncomingMessage, WSAudioMessage, WSInitMessage } from '@/types/websocket'
+
+export type AgentState =
+    | 'IDLE'
+    | 'CONNECTING'
+    | 'READY'
+    | 'LISTENING'
+    | 'SPEAKING'
+    | 'ERROR'
+    | 'DISCONNECTING';
 
 interface TranscriptItem {
     type: 'interim' | 'final'
@@ -40,6 +50,7 @@ interface ProgressData {
 }
 
 interface UseVoiceAgentReturn {
+    state: AgentState
     isConnected: boolean
     isListening: boolean
     transcript: TranscriptItem[]
@@ -57,46 +68,144 @@ interface UseVoiceAgentReturn {
 }
 
 export function useVoiceAgent(): UseVoiceAgentReturn {
-    const [isConnected, setIsConnected] = useState(false)
-    const [isListening, setIsListening] = useState(false)
+    const [state, setState] = useState<AgentState>('IDLE')
     const [transcript, setTranscript] = useState<TranscriptItem[]>([])
     const [feedback, setFeedback] = useState<FeedbackItem[]>([])
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [progress, setProgress] = useState<ProgressData | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [isAISpeaking, setIsAISpeaking] = useState(false)
     const [audioData, setAudioData] = useState<Uint8Array>(new Uint8Array(0))
 
     const wsRef = useRef<WebSocket | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
+    const workletNodeRef = useRef<AudioWorkletNode | null>(null)
     const mediaStreamRef = useRef<MediaStream | null>(null)
-    const processorRef = useRef<ScriptProcessorNode | null>(null)
-    // Use ref to track listening state for the audio callback (avoids stale closure)
-    const isListeningRef = useRef(false)
+    const stateRef = useRef<AgentState>('IDLE')
 
+    // Track state in ref for callbacks
+    useEffect(() => {
+        stateRef.current = state
+    }, [state])
+
+    // Backpressure settings
+    const MAX_BUFFERED_AMOUNT = 1024 * 1024; // 1MB buffer limit
     const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
+
+    // Playback logic refs
+    const playbackContextRef = useRef<AudioContext | null>(null)
+    const nextStartTimeRef = useRef<number>(0)
+    const audioQueueRef = useRef<AudioBuffer[]>([])
+    const isProcessingQueueRef = useRef<boolean>(false)
+
+    // Handle incoming messages
+    const handleMessage = useCallback((data: WSIncomingMessage) => {
+        switch (data.type) {
+            case 'session_started':
+                setSessionId(data.session_id)
+                setState('READY')
+                setError(null)
+                break
+
+            case 'interim_transcript':
+                setTranscript(prev => {
+                    const items = prev.filter(t => t.type !== 'interim')
+                    return [...items, {
+                        type: 'interim' as const,
+                        text: data.text,
+                        confidence: data.confidence,
+                        timestamp: new Date(),
+                    }]
+                })
+                break
+
+            case 'final_transcript':
+                setTranscript(prev => {
+                    const items = prev.filter(t => t.type !== 'interim')
+                    return [...items, {
+                        type: 'final' as const,
+                        text: data.text,
+                        confidence: data.confidence,
+                        words: (data as any).words,
+                        timestamp: new Date(),
+                    }]
+                })
+                break
+
+            case 'feedback':
+                setFeedback(prev => [...prev, {
+                    text: data.text,
+                    grammar_corrections: data.grammar_corrections || [],
+                    vocabulary_suggestions: (data as any).vocabulary_suggestions || [],
+                    pronunciation_tips: (data as any).pronunciation_tips || [],
+                    follow_up_question: (data as any).follow_up_question,
+                    timestamp: new Date(),
+                }])
+                break
+
+            case 'audio':
+                playAudio((data as WSAudioMessage).audio, (data as WSAudioMessage).sample_rate || 24000)
+                break
+
+            case 'error':
+                setError(data.message)
+                setState('ERROR')
+                break
+
+            case 'progress':
+                setProgress({
+                    duration: data.duration_seconds,
+                    turns: data.turns_count,
+                    avgConfidence: data.avg_confidence,
+                    grammarMistakes: data.grammar_mistakes,
+                })
+                break
+        }
+    }, [])
+
+    const stopAudioCapture = useCallback(() => {
+        if (workletNodeRef.current) {
+            workletNodeRef.current.disconnect()
+            workletNodeRef.current = null
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop())
+            mediaStreamRef.current = null
+        }
+    }, [])
+
+    const retryCountRef = useRef(0)
+    const MAX_RETRIES = 5
 
     // Connect to WebSocket
     const connect = useCallback((level: string, topic: string, userId?: string, voiceId?: string) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-            return
-        }
+        if (wsRef.current?.readyState === WebSocket.OPEN) return
+
+        setState('CONNECTING')
+
+        // Connection timeout
+        const timeoutId = setTimeout(() => {
+            if (stateRef.current === 'CONNECTING') {
+                console.error('WebSocket connection timed out')
+                setError('Connection timed out')
+                setState('ERROR')
+                if (wsRef.current) wsRef.current.close()
+            }
+        }, 10000)
 
         try {
-            const ws = new WebSocket(`${WS_URL}/ws/voice`)
+            const ws = new WebSocket(`${WS_URL}/ws/voice?token=${process.env.NEXT_PUBLIC_AUTH_TOKEN || 'aura-2-tha'}`) // Placeholder token
             wsRef.current = ws
 
             ws.onopen = () => {
-                console.log('WebSocket connected')
-
-                // Send initialization message
-                ws.send(JSON.stringify({
+                clearTimeout(timeoutId)
+                const initMsg: WSInitMessage = {
                     type: 'init',
                     level,
                     topic,
                     user_id: userId,
                     voice_id: voiceId,
-                }))
+                }
+                ws.send(JSON.stringify(initMsg))
             }
 
             ws.onmessage = (event) => {
@@ -111,88 +220,31 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             ws.onerror = (event) => {
                 console.error('WebSocket error:', event)
                 setError('Connection error')
+                setState('ERROR')
             }
 
             ws.onclose = () => {
-                console.log('WebSocket closed')
-                setIsConnected(false)
-                setIsListening(false)
-                isListeningRef.current = false
-                stopAudioCapture()
+                if (stateRef.current !== 'DISCONNECTING' && retryCountRef.current < MAX_RETRIES) {
+                    const backoff = Math.pow(2, retryCountRef.current) * 1000
+                    retryCountRef.current++
+                    console.log(`Retrying connection in ${backoff}ms... (Attempt ${retryCountRef.current})`)
+                    setTimeout(() => connect(level, topic, userId, voiceId), backoff)
+                } else if (stateRef.current !== 'DISCONNECTING') {
+                    setState('IDLE')
+                }
             }
 
         } catch (e) {
             console.error('Failed to connect:', e)
             setError('Failed to connect')
+            setState('ERROR')
         }
-    }, [WS_URL])
-
-    // Handle incoming messages
-    const handleMessage = useCallback((data: any) => {
-        switch (data.type) {
-            case 'session_started':
-                setSessionId(data.session_id)
-                setIsConnected(true)
-                setError(null)
-                break
-
-            case 'interim_transcript':
-                setTranscript(prev => {
-                    // Update or add interim transcript
-                    const items = prev.filter(t => t.type !== 'interim')
-                    return [...items, {
-                        type: 'interim' as const,
-                        text: data.text,
-                        confidence: data.confidence,
-                        timestamp: new Date(),
-                    }]
-                })
-                break
-
-            case 'final_transcript':
-                setTranscript(prev => {
-                    // Remove interim and add final
-                    const items = prev.filter(t => t.type !== 'interim')
-                    return [...items, {
-                        type: 'final' as const,
-                        text: data.text,
-                        confidence: data.confidence,
-                        words: data.words,
-                        timestamp: new Date(),
-                    }]
-                })
-                break
-
-            case 'feedback':
-                setFeedback(prev => [...prev, {
-                    text: data.text,
-                    grammar_corrections: data.grammar_corrections || [],
-                    vocabulary_suggestions: data.vocabulary_suggestions || [],
-                    pronunciation_tips: data.pronunciation_tips || [],
-                    follow_up_question: data.follow_up_question,
-                    timestamp: new Date(),
-                }])
-                break
-
-            case 'audio':
-                // Play TTS audio
-                playAudio(data.audio, data.sample_rate || 24000)
-                break
-
-            case 'error':
-                setError(data.message)
-                break
-
-            case 'progress':
-                setProgress(data)
-                break
-        }
-    }, [])
+    }, [WS_URL, handleMessage])
 
     // Disconnect
     const disconnect = useCallback(() => {
+        setState('DISCONNECTING')
         if (wsRef.current) {
-            // Only send stop message if WebSocket is open
             if (wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify({ type: 'stop' }))
             }
@@ -200,22 +252,17 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             wsRef.current = null
         }
         stopAudioCapture()
-        setIsConnected(false)
-        setIsListening(false)
-        isListeningRef.current = false
         setSessionId(null)
-    }, [])
+        setState('IDLE')
+    }, [stopAudioCapture])
 
-    // Start audio capture
+    // Start audio capture with AudioWorklet
     const startListening = useCallback(async () => {
-        if (!isConnected) {
-            console.log('Cannot start listening - not connected')
+        if (stateRef.current !== 'READY' && stateRef.current !== 'SPEAKING') {
             return
         }
 
         try {
-            console.log('Requesting microphone access...')
-            // Request microphone access
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     sampleRate: 16000,
@@ -224,113 +271,68 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
                     noiseSuppression: true,
                 }
             })
-
-            console.log('Microphone access granted')
             mediaStreamRef.current = stream
 
-            // Create audio context
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-                sampleRate: 16000,
-            })
+            if (!audioContextRef.current) {
+                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+                    sampleRate: 16000,
+                })
+            }
+            const audioContext = audioContextRef.current
 
-            const source = audioContextRef.current.createMediaStreamSource(stream)
+            // Load worklet
+            await audioContext.audioWorklet.addModule('/worklets/capture-processor.js')
 
-            // Create analyser for visualization
-            const analyser = audioContextRef.current.createAnalyser()
+            const source = audioContext.createMediaStreamSource(stream)
+            const workletNode = new AudioWorkletNode(audioContext, 'capture-processor')
+            workletNodeRef.current = workletNode
+
+            const analyser = audioContext.createAnalyser()
             analyser.fftSize = 256
             source.connect(analyser)
 
-            const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1)
-            processorRef.current = processor
-
-            // Update frequency data in a loop
-            const bufferLength = analyser.frequencyBinCount
-            const dataArray = new Uint8Array(bufferLength)
-
-            const updateFrequencyData = () => {
-                if (!isListeningRef.current) return
+            // Audio visualization
+            const dataArray = new Uint8Array(analyser.frequencyBinCount)
+            const updateVisuals = () => {
+                if (stateRef.current !== 'LISTENING') return
                 analyser.getByteFrequencyData(dataArray)
                 setAudioData(new Uint8Array(dataArray))
-                requestAnimationFrame(updateFrequencyData)
+                requestAnimationFrame(updateVisuals)
             }
-            updateFrequencyData()
 
-            // Set listening state BEFORE creating the callback
-            setIsListening(true)
-            isListeningRef.current = true
-
-            let chunkCount = 0
-
-            processor.onaudioprocess = (e) => {
-                // Use ref instead of state to avoid stale closure
-                if (!isListeningRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-                    return
-                }
-
-                const inputData = e.inputBuffer.getChannelData(0)
-
-                // Convert float32 to int16
-                const int16Data = new Int16Array(inputData.length)
-                for (let i = 0; i < inputData.length; i++) {
-                    const s = Math.max(-1, Math.min(1, inputData[i]))
-                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-                }
-
-                // Send as binary
-                wsRef.current.send(int16Data.buffer)
-
-                chunkCount++
-                if (chunkCount % 20 === 0) {
-                    console.log(`Sent ${chunkCount} audio chunks (${chunkCount * 4096 * 2} bytes)`)
+            workletNode.port.onmessage = (event) => {
+                const ws = wsRef.current
+                if (ws && ws.readyState === WebSocket.OPEN && stateRef.current === 'LISTENING') {
+                    if (ws.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+                        return
+                    }
+                    ws.send(event.data)
                 }
             }
 
-            source.connect(processor)
-            processor.connect(audioContextRef.current.destination)
+            source.connect(workletNode)
+            // Removed: workletNode.connect(audioContext.destination) to prevent echo
 
-            console.log('Audio capture started - sending audio to backend')
+            setState('LISTENING')
+            requestAnimationFrame(updateVisuals)
 
         } catch (e) {
-            console.error('Failed to start audio capture:', e)
+            console.error('Failed to start AudioWorklet:', e)
             setError('Microphone access denied')
-        }
-    }, [isConnected])
-
-    // Stop audio capture
-    const stopAudioCapture = useCallback(() => {
-        if (processorRef.current) {
-            processorRef.current.disconnect()
-            processorRef.current = null
-        }
-
-        if (audioContextRef.current) {
-            audioContextRef.current.close()
-            audioContextRef.current = null
-        }
-
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop())
-            mediaStreamRef.current = null
+            setState('ERROR')
         }
     }, [])
 
-    // Stop listening
     const stopListening = useCallback(() => {
-        console.log('Stopping listening')
-        setIsListening(false)
-        isListeningRef.current = false
-        stopAudioCapture()
+        if (stateRef.current === 'LISTENING') {
+            setState('READY')
+            stopAudioCapture()
+        }
     }, [stopAudioCapture])
 
-    // Send text message
     const sendTextMessage = useCallback((text: string) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({
-                type: 'text',
-                text,
-            }))
-
-            // Add to transcript
+            wsRef.current.send(JSON.stringify({ type: 'text', text }))
             setTranscript(prev => [...prev, {
                 type: 'final',
                 text,
@@ -340,16 +342,8 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
         }
     }, [])
 
-    // Play audio from base64 with queuing
-    const playbackContextRef = useRef<AudioContext | null>(null)
-    const nextStartTimeRef = useRef<number>(0)
-    const audioQueueRef = useRef<AudioBuffer[]>([])
-    const isProcessingQueueRef = useRef<boolean>(false)
-
     const processAudioQueue = useCallback(async () => {
-        if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) {
-            return
-        }
+        if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) return
 
         isProcessingQueueRef.current = true
         if (!playbackContextRef.current) {
@@ -359,28 +353,24 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
 
         while (audioQueueRef.current.length > 0) {
             const audioBuffer = audioQueueRef.current.shift()!
-
             const source = audioContext.createBufferSource()
             source.buffer = audioBuffer
             source.connect(audioContext.destination)
 
-            // Calculate start time
             let startTime = nextStartTimeRef.current
             const currentTime = audioContext.currentTime
 
-            // If we've fallen behind, start from now
             if (startTime < currentTime) {
-                startTime = currentTime + 0.1 // Small buffer
+                startTime = currentTime + 0.1
             }
 
             source.start(startTime)
             nextStartTimeRef.current = startTime + audioBuffer.duration
-            setIsAISpeaking(true)
+            setState('SPEAKING')
 
-            // When the last scheduled buffer ends, set isAISpeaking to false
             source.onended = () => {
                 if (audioContext.currentTime >= nextStartTimeRef.current - 0.05) {
-                    setIsAISpeaking(false)
+                    setState(prev => prev === 'SPEAKING' ? 'READY' : prev)
                 }
             }
         }
@@ -394,14 +384,12 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             }
             const audioContext = playbackContextRef.current
 
-            // Decode base64 to array buffer
             const binaryString = atob(base64Audio)
             const bytes = new Uint8Array(binaryString.length)
             for (let i = 0; i < binaryString.length; i++) {
                 bytes[i] = binaryString.charCodeAt(i)
             }
 
-            // Create audio buffer from linear16 PCM
             const int16Array = new Int16Array(bytes.buffer)
             const audioBuffer = audioContext.createBuffer(1, int16Array.length, sampleRate)
             const channelData = audioBuffer.getChannelData(0)
@@ -410,17 +398,14 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
                 channelData[i] = int16Array[i] / 32768.0
             }
 
-            // Add to queue and process
             audioQueueRef.current.push(audioBuffer)
             processAudioQueue()
-
         } catch (e) {
             console.error('Failed to play audio:', e)
-            setIsAISpeaking(false)
+            setState('READY')
         }
     }, [processAudioQueue])
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             disconnect()
@@ -428,8 +413,9 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
     }, [disconnect])
 
     return {
-        isConnected,
-        isListening,
+        state,
+        isConnected: state !== 'IDLE' && state !== 'CONNECTING' && state !== 'ERROR',
+        isListening: state === 'LISTENING',
         transcript,
         feedback,
         sessionId,
@@ -440,7 +426,7 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
         startListening,
         stopListening,
         sendTextMessage,
-        isAISpeaking,
+        isAISpeaking: state === 'SPEAKING',
         audioData,
     }
 }

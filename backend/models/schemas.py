@@ -91,9 +91,9 @@ class FeedbackResponse(BaseModel):
     """Complete feedback response from LLM."""
     type: str = "feedback"
     text: str  # Natural language feedback
-    grammar_corrections: List[GrammarCorrection] = []
-    vocabulary_suggestions: List[VocabularySuggestion] = []
-    pronunciation_tips: List[PronunciationTip] = []
+    grammar_corrections: List[GrammarCorrection] = Field(default_factory=list)
+    vocabulary_suggestions: List[VocabularySuggestion] = Field(default_factory=list)
+    pronunciation_tips: List[PronunciationTip] = Field(default_factory=list)
     follow_up_question: Optional[str] = None
 
 
@@ -141,6 +141,14 @@ class VocabularyItem(BaseModel):
     pronunciation: str
 
 
+class TextPracticeRequest(BaseModel):
+    """Request model for text practice endpoint."""
+    text: str
+    session_id: Optional[str] = None
+    level: ProficiencyLevel = ProficiencyLevel.INTERMEDIATE
+    topic: ConversationTopic = ConversationTopic.FREE_TALK
+
+
 class PronunciationGuide(BaseModel):
     """Pronunciation guide for RAG context."""
     word: str
@@ -168,3 +176,13 @@ class WSControlMessage(BaseModel):
     type: str  # start, stop, pause, resume
     session_id: Optional[str] = None
     settings: Optional[dict] = None
+
+class ErrorDetail(BaseModel):
+    message: str
+    code: Optional[str] = None
+    field: Optional[str] = None
+
+class ErrorResponse(BaseModel):
+    success: bool = False
+    error: ErrorDetail
+    request_id: Optional[str] = None

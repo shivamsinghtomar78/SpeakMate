@@ -116,13 +116,29 @@ IMPORTANT: You are having a real conversation. Make it feel natural, not like a 
                 topic=topic
             )
             
-            last_message = result["messages"][-1].content
+            ai_response_text = result["messages"][-1].content
+            
+            # Cast list items to schema objects for strict validation
+            grammar_corrections = [
+                GrammarCorrection(**c) if isinstance(c, dict) else c 
+                for c in result.get("grammar_corrections", [])
+            ]
+            vocab_suggestions = [
+                VocabularySuggestion(
+                    word=s.get("word", ""),
+                    definition=s.get("definition", ""),
+                    usage_example=s.get("usage", ""),
+                    level=level
+                ) if isinstance(s, dict) else s
+                for s in result.get("vocab_suggestions", [])
+            ]
             
             # Map result back to FeedbackResponse
             return FeedbackResponse(
-                text=last_message,
-                grammar_corrections=result.get("grammar_corrections", []),
-                pronunciation_tips=self._extract_pronunciation_tips(low_confidence_words := [
+                text=ai_response_text,
+                grammar_corrections=grammar_corrections,
+                vocabulary_suggestions=vocab_suggestions,
+                pronunciation_tips=self._extract_pronunciation_tips([
                     w for w in confidence_scores if w.get("confidence", 1.0) < 0.8
                 ]),
                 follow_up_question=result.get("follow_up_question"),

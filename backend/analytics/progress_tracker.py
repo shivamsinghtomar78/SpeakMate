@@ -46,12 +46,13 @@ class ProgressTracker:
         confidence_scores: List[Dict[str, Any]],
         feedback: Dict[str, Any]
     ):
-        """Record a conversation turn."""
+        """Record a conversation turn atomically."""
+        avg_conf = self._calculate_avg_confidence(confidence_scores)
+        
         turn_data = {
-            "timestamp": datetime.utcnow(),
             "user_text": user_text,
             "word_count": len(user_text.split()),
-            "avg_confidence": self._calculate_avg_confidence(confidence_scores),
+            "avg_confidence": avg_conf,
             "low_confidence_words": [
                 w for w in confidence_scores 
                 if w.get("confidence", 1.0) < 0.8
@@ -60,27 +61,14 @@ class ProgressTracker:
             "feedback_given": feedback.get("text", ""),
         }
         
-        # Update session with new turn
-        session = await db.get_session(session_id)
-        if session:
-            turns = session.get("turns", [])
-            turns.append(turn_data)
-            
-            # Update aggregated metrics
-            metrics = session.get("metrics", {})
-            metrics["total_words"] = metrics.get("total_words", 0) + turn_data["word_count"]
-            metrics["grammar_mistakes"] = (
-                metrics.get("grammar_mistakes", 0) + turn_data["grammar_corrections"]
-            )
-            
-            # Update average confidence
-            all_confidences = [t.get("avg_confidence", 0) for t in turns]
-            metrics["avg_confidence"] = sum(all_confidences) / len(all_confidences)
-            
-            await db.update_session(session_id, {
-                "turns": turns,
-                "metrics": metrics,
-            })
+        # Atomic update in DB
+        await db.add_turn_to_session(session_id, turn_data)
+        
+        # Update session average confidence in metrics (optional, for fast access)
+        # Note: True average calculation over all turns would be done on end_session
+        await db.update_session(session_id, {
+            "metrics.last_avg_confidence": avg_conf
+        })
     
     async def end_session(self, session_id: str) -> Dict[str, Any]:
         """End a session and generate summary."""
@@ -90,23 +78,29 @@ class ProgressTracker:
         if not session:
             return {"error": "Session not found"}
         
+        # Fetch turns from separate collection
+        transcripts = await db.get_session_transcripts(session_id)
+        
         # Calculate session statistics
         started_at = session.get("started_at", datetime.utcnow())
         ended_at = session.get("ended_at", datetime.utcnow())
         duration = (ended_at - started_at).total_seconds()
         
-        turns = session.get("turns", [])
         metrics = session.get("metrics", {})
+        
+        # Recalculate true average confidence if needed
+        all_conf = [t.get("avg_confidence", 0) for t in transcripts]
+        avg_confidence = sum(all_conf) / len(all_conf) if all_conf else 100.0
         
         summary = {
             "session_id": session_id,
             "duration_seconds": int(duration),
             "duration_formatted": self._format_duration(duration),
-            "turns_count": len(turns),
+            "turns_count": len(transcripts),
             "total_words_spoken": metrics.get("total_words", 0),
-            "avg_confidence": round(metrics.get("avg_confidence", 0) * 100, 1),
+            "avg_confidence": round(avg_confidence, 1),
             "grammar_mistakes": metrics.get("grammar_mistakes", 0),
-            "improvement_areas": self._identify_improvement_areas(turns),
+            "improvement_areas": self._identify_improvement_areas(transcripts),
         }
         
         # Save progress record
@@ -180,12 +174,13 @@ class ProgressTracker:
         }
     
     def _calculate_avg_confidence(self, scores: List[Dict[str, Any]]) -> float:
-        """Calculate average confidence from word scores."""
+        """Calculate average confidence from word scores (0-100)."""
         if not scores:
-            return 1.0
+            return 100.0
         
         confidences = [s.get("confidence", 1.0) for s in scores]
-        return sum(confidences) / len(confidences)
+        avg = sum(confidences) / len(confidences)
+        return round(avg * 100, 1)
     
     def _format_duration(self, seconds: float) -> str:
         """Format duration in human-readable form."""

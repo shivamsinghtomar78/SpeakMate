@@ -112,6 +112,33 @@ class Database:
             "ended_at": datetime.utcnow()
         })
     
+    async def add_turn_to_session(self, session_id: str, turn_data: Dict[str, Any]) -> bool:
+        """
+        Add a turn to a session atomically.
+        Increments turn count and pushes to transcripts collection.
+        """
+        turn_data["session_id"] = session_id
+        turn_data["timestamp"] = datetime.utcnow()
+        
+        # 1. Insert into transcripts collection (scalable)
+        await self.db.transcripts.insert_one(turn_data)
+        
+        # 2. Update session metadata atomically
+        # This keeps the session document small while maintaining aggregated metrics
+        result = await self.db.sessions.update_one(
+            {"_id": ObjectId(session_id)},
+            {
+                "$inc": {
+                    "metrics.turns_count": 1,
+                    "metrics.total_words": turn_data.get("word_count", 0)
+                },
+                "$set": {
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        return result.modified_count > 0
+    
     # ============ Transcript Operations ============
     
     async def save_transcript(self, transcript_data: Dict[str, Any]) -> str:

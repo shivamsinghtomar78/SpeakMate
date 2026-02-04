@@ -13,6 +13,8 @@ class RAGRetrieval:
     
     def __init__(self):
         self.use_qubrid = False
+        self._cache = {}  # (user_input, level) -> context
+        self._cache_limit = 100
         
     async def initialize(self):
         """Initialize retrieval settings."""
@@ -59,6 +61,10 @@ class RAGRetrieval:
         limit: int = 3
     ) -> str:
         """Retrieve relevant learning materials for context."""
+        # Simple cache check
+        cache_key = (user_input.lower().strip(), level)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
         
         context_parts = []
         
@@ -88,7 +94,14 @@ class RAGRetrieval:
                     f"- {pron.get('word', '')}: {pron.get('phonetic', '')} - {pron.get('tips', '')}"
                 )
         
-        return "\n".join(context_parts) if context_parts else ""
+        result = "\n".join(context_parts) if context_parts else ""
+        
+        # Update cache
+        if len(self._cache) >= self._cache_limit:
+            self._cache.pop(next(iter(self._cache))) # Simple FIFO
+        self._cache[cache_key] = result
+        
+        return result
     
 
     async def _get_relevant_grammar(

@@ -285,7 +285,10 @@ function ChatContent() {
 
                                             {item.follow_up_question && (
                                                 <div className="p-2 rounded bg-purple-500/10 border border-purple-500/20">
-                                                    <p className="text-xs text-purple-400">💬 {item.follow_up_question}</p>
+                                                    <p className="text-xs text-purple-400">
+                                                        <span role="img" aria-label="thought-balloon" className="mr-1">💬</span>
+                                                        {item.follow_up_question}
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>

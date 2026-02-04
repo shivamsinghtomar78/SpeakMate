@@ -13,6 +13,7 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
     const [isPlaying, setIsPlaying] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const audioRef = useRef<HTMLAudioElement | null>(null)
+    const audioUrlRef = useRef<string | null>(null)
 
     const handlePreview = async (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -20,6 +21,10 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
         if (isPlaying) {
             audioRef.current?.pause()
             setIsPlaying(false)
+            if (audioUrlRef.current) {
+                URL.revokeObjectURL(audioUrlRef.current)
+                audioUrlRef.current = null
+            }
             return
         }
 
@@ -27,7 +32,10 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
         try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/voice/preview`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_AUTH_TOKEN || 'aura-2-tha'}`
+                },
                 body: JSON.stringify({
                     voice_id: voiceId,
                     text: `Hello! I'm ${label}. I'm excited to practice English with you!`
@@ -37,9 +45,15 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
             if (!response.ok) throw new Error('Failed to fetch preview')
             const data = await response.json()
 
+            // Cleanup previous preview
+            if (audioUrlRef.current) {
+                URL.revokeObjectURL(audioUrlRef.current)
+            }
+
             // Create audio from base64
             const audioBlob = await (await fetch(`data:audio/wav;base64,${data.audio}`)).blob()
             const audioUrl = URL.createObjectURL(audioBlob)
+            audioUrlRef.current = audioUrl
 
             if (audioRef.current) {
                 audioRef.current.src = audioUrl
@@ -49,7 +63,10 @@ export function VoicePreview({ voiceId, label }: VoicePreviewProps) {
 
             audioRef.current.onended = () => {
                 setIsPlaying(false)
-                URL.revokeObjectURL(audioUrl)
+                if (audioUrlRef.current === audioUrl) {
+                    URL.revokeObjectURL(audioUrl)
+                    audioUrlRef.current = null
+                }
             }
 
             await audioRef.current.play()

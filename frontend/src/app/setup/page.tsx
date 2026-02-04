@@ -198,9 +198,10 @@ export default function SetupPage() {
                             {/* Back button */}
                             <button
                                 onClick={() => setStep(1)}
-                                className="mt-8 text-gray-400 hover:text-white transition-colors"
+                                className="mt-8 text-gray-400 hover:text-white transition-colors flex items-center gap-1"
                             >
-                                ← Change level
+                                <ArrowLeft className="w-4 h-4" />
+                                <span>Change level</span>
                             </button>
                         </motion.div>
                     ) : (
@@ -283,9 +284,10 @@ export default function SetupPage() {
                             {/* Back button */}
                             <button
                                 onClick={() => setStep(2)}
-                                className="mt-8 text-gray-400 hover:text-white transition-colors"
+                                className="mt-8 text-gray-400 hover:text-white transition-colors flex items-center gap-1"
                             >
-                                ← Change topic
+                                <ArrowLeft className="w-4 h-4" />
+                                <span>Change topic</span>
                             </button>
                         </motion.div>
                     )}
