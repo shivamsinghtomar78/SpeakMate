@@ -30,6 +30,7 @@ class PracticeState(TypedDict):
 
 class FeedbackOutput(BaseModel):
     """Structured feedback from the AI partner."""
+    ai_response: str = Field(description="The natural conversational response to the user's message")
     grammar_corrections: List[Dict[str, str]] = Field(
         default_factory=list,
         description="List of corrections with 'original', 'corrected', and 'explanation'"
@@ -38,7 +39,7 @@ class FeedbackOutput(BaseModel):
         default_factory=list,
         description="List of suggestions with 'word', 'definition', and 'usage'"
     )
-    follow_up_question: str = Field(description="The follow-up question to keep the conversation going")
+    follow_up_question: str = Field(description="The specific follow-up question at the end of the response")
     fluency_score: int = Field(description="A score from 0-100 indicating the user's fluency in this turn")
 
 class PracticeGraph:
@@ -60,14 +61,12 @@ class PracticeGraph:
         
         # Add nodes
         workflow.add_node("retrieve_context", self.retrieve_context)
-        workflow.add_node("generate_response", self.generate_response)
-        workflow.add_node("analyze_feedback", self.analyze_feedback)
+        workflow.add_node("generate_and_analyze", self.generate_and_analyze)
         
         # Define edges
         workflow.set_entry_point("retrieve_context")
-        workflow.add_edge("retrieve_context", "generate_response")
-        workflow.add_edge("generate_response", "analyze_feedback")
-        workflow.add_edge("analyze_feedback", END)
+        workflow.add_edge("retrieve_context", "generate_and_analyze")
+        workflow.add_edge("generate_and_analyze", END)
         
         self.app = workflow.compile()
 
@@ -83,55 +82,38 @@ class PracticeGraph:
         context = await rag_retrieval.retrieve_context(last_message, level=state["level"])
         return {"context": context}
 
-    @traceable(name="generate_response")
-    async def generate_response(self, state: PracticeState):
-        """Node: Generate the AI partner's response."""
+    @traceable(name="generate_and_analyze")
+    async def generate_and_analyze(self, state: PracticeState):
+        """Node: Generate response and feedback in a single structured call."""
         system_prompt = self._build_system_prompt(state["level"], state["topic"], state["context"])
         
-        # Filter messages for context window if needed
-        messages = [SystemMessage(content=system_prompt)] + list(state["messages"])
-        
-        try:
-            response = await self.llm.ainvoke(messages)
-            return {"messages": [response]}
-        except Exception as e:
-            logger.error(f"Error in generate_response node: {e}")
-            return {"messages": [AIMessage(content="I'm sorry, I'm having trouble thinking right now. Let's try again!")]}
+        # Add a hint for structured output
+        prompt_with_instructions = f"""{system_prompt}
 
-    @traceable(name="analyze_feedback")
-    async def analyze_feedback(self, state: PracticeState):
-        """Node: Extract feedback and follow-up from the response using structured output."""
-        last_ai_message = state["messages"][-1].content
-        
-        # Find the last user message to compare for feedback
-        user_messages = [m for m in state["messages"] if isinstance(m, HumanMessage)]
-        last_user_input = user_messages[-1].content if user_messages else ""
-        
-        prompt = f"""You are an English linguistic analyst. 
-Based on the conversation and the AI's response, extract structured feedback.
-
-USER SAID: {last_user_input}
-AI RESPONDED: {last_ai_message}
-
-Extract:
-1. Any grammar corrections the AI made or should have made.
-2. Any useful vocabulary suggestions.
-3. The specific follow-up question the AI asked.
-4. An estimated fluency score (0-100) based on the user's input.
+As you generate your response, also identify any grammar mistakes or vocabulary improvements for the user's last message.
 """
+        messages = [SystemMessage(content=prompt_with_instructions)] + list(state["messages"])
+        
         try:
-            feedback = await self.structured_llm.ainvoke(prompt)
+            # Single call to get everything
+            output: FeedbackOutput = await self.structured_llm.ainvoke(messages)
+            
+            # AIMessage for the messages list (full conversational text)
+            full_text = f"{output.ai_response} {output.follow_up_question}"
+            ai_message = AIMessage(content=full_text)
+            
             return {
-                "follow_up_question": feedback.follow_up_question,
-                "grammar_corrections": feedback.grammar_corrections,
-                "vocab_suggestions": feedback.vocab_suggestions
+                "messages": [ai_message],
+                "ai_response": output.ai_response,
+                "follow_up_question": output.follow_up_question,
+                "grammar_corrections": output.grammar_corrections,
+                "vocab_suggestions": output.vocab_suggestions
             }
         except Exception as e:
-            logger.error(f"Error in analyze_feedback node: {e}")
-            # Fallback to simple extraction
-            follow_up = last_ai_message.split('?')[-2].strip() + '?' if '?' in last_ai_message else None
+            logger.error(f"Error in generate_and_analyze node: {e}")
             return {
-                "follow_up_question": follow_up,
+                "messages": [AIMessage(content="That's interesting! Keep going.")],
+                "follow_up_question": "What else is on your mind?",
                 "grammar_corrections": [],
                 "vocab_suggestions": []
             }

@@ -132,10 +132,9 @@ IMPORTANT: You are having a real conversation. Make it feel natural, not like a 
                 ) if isinstance(s, dict) else s
                 for s in result.get("vocab_suggestions", [])
             ]
-            
             # Map result back to FeedbackResponse
             return FeedbackResponse(
-                text=ai_response_text,
+                text=result.get("ai_response", "Nice job!"),
                 grammar_corrections=grammar_corrections,
                 vocabulary_suggestions=vocab_suggestions,
                 pronunciation_tips=self._extract_pronunciation_tips([

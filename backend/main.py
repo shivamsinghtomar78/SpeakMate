@@ -565,16 +565,13 @@ async def text_practice(request: TextPracticeRequest):
         level = request.level
         topic = request.topic
         
-        # Get RAG context
-        context = await rag_retrieval.retrieve_context(text, level=level.value)
-        
-        # Generate feedback
+        # Generate feedback (RAG is handled inside the LangGraph)
         feedback = await llm_service.generate_feedback(
             user_text=text,
             confidence_scores=[],
             level=level,
             topic=topic.value,
-            rag_context=context,
+            conversation_history=[],
         )
         
         return {
