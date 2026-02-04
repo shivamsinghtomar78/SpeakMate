@@ -21,6 +21,7 @@ from models.schemas import (
     ProficiencyLevel,
     ConversationTopic,
     FeedbackResponse,
+    TextPracticeRequest,
 )
 from services.voice_agent import voice_agent, DeepgramVoiceAgent, TranscriptResult
 from services.llm_service import llm_service
