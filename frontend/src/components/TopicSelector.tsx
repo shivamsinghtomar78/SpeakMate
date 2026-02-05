@@ -34,8 +34,8 @@ export default function TopicSelector({
         <div className="space-y-6">
             {/* Level Selection */}
             <div>
-                <label className="block text-sm font-medium text-gray-400 mb-3">
-                    Your English Level
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">
+                    Proficiency Level
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                     {levels.map((lvl) => (
@@ -43,17 +43,17 @@ export default function TopicSelector({
                             key={lvl.id}
                             onClick={() => onLevelChange(lvl.id)}
                             className={`
-                p-3 rounded-lg border transition-all duration-200 text-left
-                ${level === lvl.id
-                                    ? 'border-primary-500 bg-primary-900/30 text-white'
-                                    : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                                p-4 rounded-2xl border transition-all duration-300 text-left
+                                ${level === lvl.id
+                                    ? 'border-primary bg-primary/10 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                                    : 'border-white/5 bg-white/[0.02] text-gray-400 hover:border-white/10 hover:bg-white/[0.04]'
                                 }
-              `}
-                            whileHover={{ scale: 1.02 }}
+                            `}
+                            whileHover={{ y: -2 }}
                             whileTap={{ scale: 0.98 }}
                         >
-                            <p className="font-medium text-sm">{lvl.label}</p>
-                            <p className="text-xs mt-1 opacity-70">{lvl.description}</p>
+                            <p className="font-semibold text-sm tracking-tight">{lvl.label}</p>
+                            <p className="text-[10px] mt-1.5 opacity-60 leading-relaxed uppercase font-bold tracking-tighter">{lvl.description}</p>
                         </motion.button>
                     ))}
                 </div>
@@ -61,8 +61,8 @@ export default function TopicSelector({
 
             {/* Topic Selection */}
             <div>
-                <label className="block text-sm font-medium text-gray-400 mb-3">
-                    Conversation Topic
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">
+                    Select Topic
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {topics.map((t) => {
@@ -74,17 +74,19 @@ export default function TopicSelector({
                                 key={t.id}
                                 onClick={() => onTopicChange(t.id)}
                                 className={`
-                  p-4 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2
-                  ${isSelected
-                                        ? 'border-primary-500 bg-primary-900/30 text-white'
-                                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                                    p-5 rounded-2xl border transition-all duration-300 flex flex-col items-center gap-3
+                                    ${isSelected
+                                        ? 'border-primary bg-primary/10 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                                        : 'border-white/5 bg-white/[0.02] text-gray-400 hover:border-white/10 hover:bg-white/[0.04]'
                                     }
-                `}
-                                whileHover={{ scale: 1.02 }}
+                                `}
+                                whileHover={{ y: -2 }}
                                 whileTap={{ scale: 0.98 }}
                             >
-                                <Icon className={`w-6 h-6 ${isSelected ? 'text-primary-400' : ''}`} />
-                                <span className="text-sm font-medium">{t.label}</span>
+                                <div className={`p-3 rounded-xl ${isSelected ? 'bg-primary text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]' : 'bg-white/5'}`}>
+                                    <Icon className="w-6 h-6" />
+                                </div>
+                                <span className="text-sm font-semibold tracking-tight">{t.label}</span>
                             </motion.button>
                         )
                     })}

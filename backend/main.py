@@ -245,7 +245,7 @@ async def get_session_progress(session_id: str, user: dict = Depends(get_current
             "level": session.get("level"),
             "topic": session.get("topic"),
             "metrics": session.get("metrics", {}),
-            "turns_count": len(session.get("turns", [])),
+            "turns_count": session.get("metrics", {}).get("turns_count", 0),
         }
         
     except HTTPException:
@@ -272,6 +272,10 @@ async def end_session(session_id: str, user: dict = Depends(get_current_user)):
 @app.get("/api/user/{user_id}/analytics")
 async def get_user_analytics(user_id: str, days: int = 30, user: dict = Depends(get_current_user)):
     """Get overall user analytics."""
+    # Authorization check
+    if user.get("id") != user_id and user.get("id") != "default_user":
+        raise HTTPException(status_code=403, detail="Not authorized to view these analytics")
+        
     try:
         analytics = await progress_tracker.get_user_analytics(user_id, days)
         return analytics
@@ -405,13 +409,9 @@ async def voice_websocket(websocket: WebSocket):
                 "is_final": True,
             })
             
-            # Record in progress tracker
-            await progress_tracker.record_turn(
-                session_id=session_id,
-                user_text=result.text,
-                confidence_scores=[],
-                feedback={}
-            )
+            # Record in progress tracker - moved to llm_think for voice turns
+            # to capture structured feedback concurrently
+            pass
         
         async def on_agent_text(text: str):
             """Handle agent text response."""
@@ -451,7 +451,8 @@ async def voice_websocket(websocket: WebSocket):
             on_agent_text=on_agent_text,
             on_agent_audio=on_agent_audio,
             on_error=on_error,
-            voice_id=voice_id
+            voice_id=voice_id,
+            session_id=session_id
         )
         
         if not connected:
@@ -517,11 +518,22 @@ async def voice_websocket(websocket: WebSocket):
                         await websocket.send_json({
                             "type": "feedback",
                             "text": ai_response,
-                            "grammar_corrections": [],
-                            "vocabulary_suggestions": [],
+                            "grammar_corrections": result.get("grammar_corrections", []),
+                            "vocabulary_suggestions": result.get("vocab_suggestions", []),
                             "pronunciation_tips": [],
-                            "follow_up_question": None,
+                            "follow_up_question": result.get("follow_up_question"),
                         })
+                        
+                        # Record turn for text practice
+                        await progress_tracker.record_turn(
+                            session_id=session_id,
+                            user_text=text,
+                            confidence_scores=[],
+                            feedback={
+                                "text": ai_response,
+                                "grammar_corrections": result.get("grammar_corrections", []),
+                            }
+                        )
                         
                         # Generate TTS and send
                         audio_chunk = await voice_agent.text_to_speech_with_voice(ai_response, voice_id)
@@ -627,6 +639,19 @@ async def llm_think(request: Dict[str, Any], verified: bool = Depends(verify_dee
         )
         
         ai_response = result["messages"][-1].content
+        
+        # Record turn if session_id is provided
+        sid = request.query_params.get("session_id")
+        if sid:
+            await progress_tracker.record_turn(
+                session_id=sid,
+                user_text=user_input,
+                confidence_scores=[], # Confidence comes later for voice, or not available here
+                feedback={
+                    "text": ai_response,
+                    "grammar_corrections": result.get("grammar_corrections", []),
+                }
+            )
         
         # Return OpenAI compatible format
         return {

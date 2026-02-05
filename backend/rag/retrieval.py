@@ -1,5 +1,6 @@
 import logging
 import httpx
+import asyncio
 from typing import List, Dict, Any, Optional
 
 from config import settings

@@ -64,11 +64,21 @@ class ProgressTracker:
         # Atomic update in DB
         await db.add_turn_to_session(session_id, turn_data)
         
-        # Update session average confidence in metrics (optional, for fast access)
-        # Note: True average calculation over all turns would be done on end_session
-        await db.update_session(session_id, {
-            "metrics.last_avg_confidence": avg_conf
-        })
+        # Update session metrics atomically
+        grammar_corrections = turn_data.get("grammar_corrections", 0)
+        await db.db.sessions.update_one(
+            {"_id": db.ObjectId(session_id)},
+            {
+                "$inc": {
+                    "metrics.grammar_mistakes": grammar_corrections,
+                    "metrics.avg_confidence_sum": avg_conf,
+                    "metrics.confidence_count": 1
+                },
+                "$set": {
+                    "metrics.last_avg_confidence": avg_conf
+                }
+            }
+        )
     
     async def end_session(self, session_id: str) -> Dict[str, Any]:
         """End a session and generate summary."""

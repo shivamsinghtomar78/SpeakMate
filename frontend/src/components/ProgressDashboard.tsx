@@ -52,66 +52,66 @@ export default function ProgressDashboard({
 
             <div className="grid grid-cols-2 gap-4">
                 {/* Duration */}
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-                        <Clock className="w-4 h-4" />
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 transition-colors hover:bg-white/[0.04]">
+                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
+                        <Clock className="w-3.5 h-3.5" />
                         Duration
                     </div>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-3xl font-bold text-white tracking-tight">
                         {formatDuration(stats.duration)}
                     </p>
                 </div>
 
                 {/* Turns */}
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-                        <MessageSquare className="w-4 h-4" />
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 transition-colors hover:bg-white/[0.04]">
+                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
+                        <MessageSquare className="w-3.5 h-3.5" />
                         Exchanges
                     </div>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-3xl font-bold text-white tracking-tight">
                         {stats.turns}
                     </p>
                 </div>
 
                 {/* Confidence */}
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-                        <Target className="w-4 h-4" />
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 transition-colors hover:bg-white/[0.04]">
+                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
+                        <Target className="w-3.5 h-3.5" />
                         Avg. Confidence
                     </div>
-                    <p className={`text-2xl font-bold ${getConfidenceColor(stats.avgConfidence)}`}>
+                    <p className={`text-3xl font-bold tracking-tight ${getConfidenceColor(stats.avgConfidence)}`}>
                         {stats.avgConfidence}%
                     </p>
                 </div>
 
                 {/* Mistakes */}
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-                        <AlertTriangle className="w-4 h-4" />
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 transition-colors hover:bg-white/[0.04]">
+                    <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wider mb-2">
+                        <AlertTriangle className="w-3.5 h-3.5" />
                         Corrections
                     </div>
-                    <p className="text-2xl font-bold text-yellow-400">
+                    <p className="text-3xl font-bold text-yellow-500 tracking-tight">
                         {stats.grammarMistakes}
                     </p>
                 </div>
             </div>
 
             {/* Confidence bar */}
-            <div className="mt-4">
-                <div className="flex justify-between text-sm text-gray-400 mb-1">
-                    <span>Speaking Confidence</span>
-                    <span>{stats.avgConfidence}%</span>
+            <div className="mt-8">
+                <div className="flex justify-between text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                    <span>Performance index</span>
+                    <span className={getConfidenceColor(stats.avgConfidence)}>{stats.avgConfidence}%</span>
                 </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-2.5 bg-white/5 rounded-full overflow-hidden p-[2px]">
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${stats.avgConfidence}%` }}
-                        transition={{ duration: 0.5 }}
-                        className={`h-full rounded-full ${stats.avgConfidence >= 80
-                                ? 'bg-green-500'
-                                : stats.avgConfidence >= 60
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className={`h-full rounded-full relative ${stats.avgConfidence >= 80
+                            ? 'bg-green-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                            : stats.avgConfidence >= 60
+                                ? 'bg-yellow-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                                : 'bg-error shadow-[0_0_15px_rgba(239,68,68,0.5)]'
                             }`}
                     />
                 </div>

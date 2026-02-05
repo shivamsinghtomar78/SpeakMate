@@ -31,7 +31,7 @@ export default function Header() {
     }
 
     return (
-        <header className="sticky top-0 z-50 border-b border-white/10 bg-black/40 backdrop-blur-xl">
+        <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0A0A0B]/60 backdrop-blur-2xl">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}
@@ -86,7 +86,7 @@ export default function Header() {
                                         <User className="w-4 h-4" />
                                         Profile
                                     </Link>
-                                    
+
                                     <div className="h-4 w-px bg-white/10" />
 
                                     <div className="relative">
@@ -113,7 +113,7 @@ export default function Header() {
                                                     initial={{ opacity: 0, y: -10 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, y: -10 }}
-                                                    className="absolute right-0 mt-2 w-56 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+                                                    className="absolute right-0 mt-2 w-56 bg-[#0A0A0B]/80 backdrop-blur-2xl border border-white/5 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden"
                                                 >
                                                     <div className="p-4 border-b border-white/10">
                                                         <p className="text-sm font-medium text-white truncate">

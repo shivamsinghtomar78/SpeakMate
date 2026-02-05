@@ -224,13 +224,15 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
             }
 
             ws.onclose = () => {
-                if (stateRef.current !== 'DISCONNECTING' && retryCountRef.current < MAX_RETRIES) {
+                const s = stateRef.current
+                if (s !== 'DISCONNECTING' && s !== 'IDLE' && retryCountRef.current < MAX_RETRIES) {
                     const backoff = Math.pow(2, retryCountRef.current) * 1000
                     retryCountRef.current++
                     console.log(`Retrying connection in ${backoff}ms... (Attempt ${retryCountRef.current})`)
                     setTimeout(() => connect(level, topic, userId, voiceId), backoff)
-                } else if (stateRef.current !== 'DISCONNECTING') {
+                } else if (s !== 'DISCONNECTING' && s !== 'IDLE') {
                     setState('IDLE')
+                    stateRef.current = 'IDLE'
                 }
             }
 
@@ -243,7 +245,9 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
 
     // Disconnect
     const disconnect = useCallback(() => {
+        stateRef.current = 'DISCONNECTING'
         setState('DISCONNECTING')
+
         if (wsRef.current) {
             if (wsRef.current.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify({ type: 'stop' }))
@@ -254,6 +258,8 @@ export function useVoiceAgent(): UseVoiceAgentReturn {
         stopAudioCapture()
         setSessionId(null)
         setState('IDLE')
+        stateRef.current = 'IDLE'
+        retryCountRef.current = 0
     }, [stopAudioCapture])
 
     // Start audio capture with AudioWorklet

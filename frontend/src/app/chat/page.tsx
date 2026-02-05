@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowLeft, MessageSquare, X, Volume2 } from 'lucide-react'
+import { Mic, MicOff, ArrowLeft, MessageSquare, X, Volume2, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { useVoiceAgent } from '@/hooks/useVoiceAgent'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import ProgressDashboard from '@/components/ProgressDashboard'
 
 function ChatContent() {
     const searchParams = useSearchParams()
@@ -18,12 +19,14 @@ function ChatContent() {
 
     const { user } = useAuth()
     const [showFeedback, setShowFeedback] = useState(false)
+    const [showProgress, setShowProgress] = useState(false)
     const {
         isConnected,
         isListening,
         transcript,
         feedback,
         sessionId,
+        progress,
         error,
         isAISpeaking,
         audioData,
@@ -85,12 +88,28 @@ function ChatContent() {
                     </span>
                 </div>
 
-                <button
-                    onClick={() => setShowFeedback(!showFeedback)}
-                    className={`p-2 rounded-lg transition-colors ${showFeedback ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <MessageSquare className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            setShowProgress(!showProgress)
+                            if (showFeedback) setShowFeedback(false)
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${showProgress ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                        title="Session Progress"
+                    >
+                        <TrendingUp className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowFeedback(!showFeedback)
+                            if (showProgress) setShowProgress(false)
+                        }}
+                        className={`p-2 rounded-lg transition-colors ${showFeedback ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                        title="AI Feedback"
+                    >
+                        <MessageSquare className="w-5 h-5" />
+                    </button>
+                </div>
             </header>
 
             {/* Main Content */}
@@ -294,6 +313,36 @@ function ChatContent() {
                                         </div>
                                     ))
                                 )}
+                            </div>
+                        </motion.aside>
+                    )}
+                </AnimatePresence>
+
+                {/* Progress Sidebar */}
+                <AnimatePresence>
+                    {showProgress && (
+                        <motion.aside
+                            initial={{ x: '100%', opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: '100%', opacity: 0 }}
+                            transition={{ type: 'spring', damping: 20 }}
+                            className="w-80 md:w-96 h-full bg-black/40 backdrop-blur-xl border-l border-white/10 overflow-y-auto"
+                        >
+                            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                                <h2 className="font-semibold text-white">Session Progress</h2>
+                                <button
+                                    onClick={() => setShowProgress(false)}
+                                    className="p-1 text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-4">
+                                <ProgressDashboard
+                                    sessionId={sessionId}
+                                    progress={progress}
+                                />
                             </div>
                         </motion.aside>
                     )}

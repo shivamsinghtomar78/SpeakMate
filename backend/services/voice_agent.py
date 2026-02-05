@@ -56,6 +56,7 @@ class DeepgramVoiceAgent:
         level: str = "intermediate",
         topic: str = "free_talk",
         voice_id: str = "aura-2-thalia-en",
+        session_id: str = None,
         on_transcript: Optional[Callable] = None,
         on_agent_text: Optional[Callable] = None,
         on_agent_audio: Optional[Callable] = None,
@@ -82,7 +83,7 @@ class DeepgramVoiceAgent:
             logger.info("Connected to Deepgram Voice Agent API")
             
             # Send settings configuration
-            await self._send_settings(level, topic, voice_id)
+            await self._send_settings(level, topic, voice_id, session_id)
             
             # Start receiving messages
             self._receive_task = asyncio.create_task(self._receive_loop())
@@ -96,7 +97,7 @@ class DeepgramVoiceAgent:
                 await self.on_error(e)
             return False
     
-    async def _send_settings(self, level: str, topic: str, voice_id: str = "aura-2-thalia-en"):
+    async def _send_settings(self, level: str, topic: str, voice_id: str = "aura-2-thalia-en", session_id: str = None):
         """Send settings configuration to the agent."""
         # Customize prompt based on level and topic
         level_prompts = {
@@ -121,10 +122,15 @@ class DeepgramVoiceAgent:
 5. Encourage the user and keep the conversation flowing
 6. Ask follow-up questions to keep them talking
 7. Keep responses concise (1-3 sentences)
+8. Respond ONLY with the natural conversation. Analyze mistakes silently and include them in the structured output if the endpoint expects it.
 
 Be warm, patient, and supportive. Focus on helping them improve their English speaking skills."""
 
         # Use Groq as the LLM provider via custom endpoint
+        think_url = f"{settings.APP_URL}/api/llm/think"
+        if session_id:
+            think_url += f"?session_id={session_id}"
+
         settings_message = {
             "type": "Settings",
             "audio": {
@@ -153,7 +159,7 @@ Be warm, patient, and supportive. Focus on helping them improve their English sp
                         "temperature": 0.7
                     },
                     "endpoint": {
-                        "url": f"{settings.APP_URL}/api/llm/think",
+                        "url": think_url,
                         "headers": {
                             "Content-Type": "application/json"
                         }

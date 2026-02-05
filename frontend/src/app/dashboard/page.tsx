@@ -49,7 +49,14 @@ export default function DashboardPage() {
         const fetchAnalytics = async () => {
             if (!user?.uid) return
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/${user.uid}/analytics`)
+                const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/user/${user.uid}/analytics`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_AUTH_TOKEN || 'aura-2-tha'}`
+                        }
+                    }
+                )
                 if (response.ok) {
                     const data = await response.json()
                     setAnalytics(data)
